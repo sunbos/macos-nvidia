@@ -1,0 +1,540 @@
+{
+  "schema_version": 1,
+  "id": "nvk-mesa",
+  "base": {
+    "repository": "https://gitlab.freedesktop.org/mesa/mesa",
+    "commit": "17ca6174dcc6cb22059ac343bc29f8af7800f42e",
+    "archive_url": "https://gitlab.freedesktop.org/api/v4/projects/176/repository/archive.tar.gz?sha=17ca6174dcc6cb22059ac343bc29f8af7800f42e&include_lfs_blobs=false&exclude_paths=src%2Fgallium%2Ftargets%2Fteflon%2Ftests%2Fmodels",
+    "archive_sha256": "827ab5337856ef7f24ac0bf278bd1f427a3328514bbffadacecd1315885f75b0",
+    "archive_excludes": [
+      "src/gallium/targets/teflon/tests/models"
+    ],
+    "include_lfs_blobs": false
+  },
+  "patch": "patches/nvk-macos-candidate.patch",
+  "patch_sha256": "e907eba3f0b070c61fad3107dfba4bf778417ed15729d371dde4015c023c3db9",
+  "selected_source_files": 81,
+  "changed_files": 81,
+  "files": [
+    {
+      "path": "include/renderdoc_app.h",
+      "base_sha256": "e5bd7ac1d07870d703e57c4a4e31b2e6bf980aa201fffa4a4f10b41ae1c23b72",
+      "source_sha256": "32f8736e5c37d693e887d85018230e1a8c4b93d59bbec4da05c79ea2acabce1f",
+      "bytes": 28373
+    },
+    {
+      "path": "meson.build",
+      "base_sha256": "79be405cacc8ab885abe483ede4244a165c888c1722124e17d64a38d6975e8ab",
+      "source_sha256": "45bb95c07a3d87e1143c5c7bf851071525188dd2248d9d4d5ee231277e7b2c43",
+      "bytes": 95162
+    },
+    {
+      "path": "src/compiler/clc/clc_helpers.cpp",
+      "base_sha256": "d6371163f7bebd9ba113c22b74db71102f5480ff1b19b35cccccab1ed9d294c9",
+      "source_sha256": "238970f6ae12a417048ab85fa7919f7b2a9676bb78291338ffcaf53ef44b0f21",
+      "bytes": 53047
+    },
+    {
+      "path": "src/nouveau/compiler/meson.build",
+      "base_sha256": "2b9493496b7d960128cb7590f354e4acb84948039af74e592fe203b1e8eba475",
+      "source_sha256": "fecebfaa9b994f5b3fa2a53202bc0cf11ef25c7c4cf71a8012d396de405c00b5",
+      "bytes": 4380
+    },
+    {
+      "path": "src/nouveau/compiler/nak/api.rs",
+      "base_sha256": "54d91d372049826740a42544da100955d06f455919bd428a4259dcafae53dcf9",
+      "source_sha256": "7392ccbd4b707b8ba5b82f6b5f4028d2f69dc24a8fe84ad8566b05f9ba8c7285",
+      "bytes": 20727
+    },
+    {
+      "path": "src/nouveau/compiler/nak/assign_regs.rs",
+      "base_sha256": "1bd4fa74fea8448dea571760b2739aee0122e0cd9875b045ba1f7461db7fca3d",
+      "source_sha256": "a86fe78d5edde89a0dec9938d2e43860866a3290116a713c6ec8e4406aa949dc",
+      "bytes": 49403
+    },
+    {
+      "path": "src/nouveau/compiler/nak/from_nir.rs",
+      "base_sha256": "3d43bada00a8b6db7ff3beeaae3199a28b7c79a27750751910df1afa80909c30",
+      "source_sha256": "1b87b06dd27877329c78dfbf9f486f02a1c58dfb70e15a23fd5727388c28476e",
+      "bytes": 188459
+    },
+    {
+      "path": "src/nouveau/compiler/nak/legalize.rs",
+      "base_sha256": "17138fae49dfd7841bfea9d8b94c555ef9f9fee2d855783f567c408af1452efa",
+      "source_sha256": "21384dfa9ba144a4f40fc6229903f22968e4e4d8eb5bc6d794329843d55c2145",
+      "bytes": 25121
+    },
+    {
+      "path": "src/nouveau/compiler/nak/opt_instr_sched_prepass.rs",
+      "base_sha256": "03b797294742f1db129b1e57a1c3011acdba384f58bb3de65ad666c80f48f624",
+      "source_sha256": "fcd950639237a2160d3a5ec04cab6395612fdae9484f9df7d31c927321b11922",
+      "bytes": 35639
+    },
+    {
+      "path": "src/nouveau/compiler/nak/opt_prmt.rs",
+      "base_sha256": "ba1914c5538be31f7e6bd0feee7ff91ec1e4be50f02f9fb0f4ef523a42f2c269",
+      "source_sha256": "148fcd2c8d4679db4b1489b62a0a4f415eebaa21f29f0152298de3e823522af1",
+      "bytes": 10562
+    },
+    {
+      "path": "src/nouveau/compiler/nak/qmd.rs",
+      "base_sha256": "04acb1da545ab571e9394898969aa182262b14d7ee76591e37fa1e98cc947eaa",
+      "source_sha256": "19e476dfcfe4e8f15f9200447ce550c1761cdb3217a94b89c44f9a8759cc295d",
+      "bytes": 42746
+    },
+    {
+      "path": "src/nouveau/compiler/nak/sm70.rs",
+      "base_sha256": "49a9ea75eff9ceabf457a45a914769f13229155183bb647507e38c43c4313080",
+      "source_sha256": "bd2d07e18ae82d1df0b0557f34cee2fee55bfe5b265346285505760d7cb08007",
+      "bytes": 9195
+    },
+    {
+      "path": "src/nouveau/compiler/nak/sm70_encode.rs",
+      "base_sha256": "002a544fd24ac959413b772b614f88b598fc7e3803823aa941163092a3e66389",
+      "source_sha256": "090afad297eb430ad2ea9897a3eaa219d73c071a79541b378f393f0ee4c98968",
+      "bytes": 145684
+    },
+    {
+      "path": "src/nouveau/compiler/nak_bindings.h",
+      "base_sha256": "ca8ec537857d98d35567f215fbfbe553bbc2582683b8a2d62360c8afe5c7d380",
+      "source_sha256": "cdcbe071adff5008d96f9f9d98c61a2ff4b8dfb87c7b484fc6a62a084b514324",
+      "bytes": 403
+    },
+    {
+      "path": "src/nouveau/compiler/nak_nir.c",
+      "base_sha256": "b3f6f94c5d60e64538eddfeb8ac11516db18df747626aa974554151625be01ae",
+      "source_sha256": "aee100de7619da26ee0d9b763067e667e5afbfc5f2b3d70c25234555354be03f",
+      "bytes": 92258
+    },
+    {
+      "path": "src/nouveau/compiler/nak_nir_lower_cf.c",
+      "base_sha256": "73d6e1d5d7e2efdf21aecba6fd21d00f58e7d33d8b7e2ed6e484be222fde5c48",
+      "source_sha256": "be7ea76195a4863b4fd20f8de8d1d5ac1509d8c25cedd342acbee1d4864121e9",
+      "bytes": 17059
+    },
+    {
+      "path": "src/nouveau/compiler/nak_nir_lower_non_uniform_ldcx.c",
+      "base_sha256": "d2a426e23d48041926cccf258f97281fc3dd6a2e69d2cb6884ce1f42239cc109",
+      "source_sha256": "a9a9d4fc08121316856b7cf21735b78c1d5f42a00312aa1c7995448536d0cba1",
+      "bytes": 20431
+    },
+    {
+      "path": "src/nouveau/compiler/nvmtl_raw_policy.h",
+      "base_sha256": null,
+      "source_sha256": "f49e654ba033da708de4b9f69b719f37b55ad851100b4789947b7295a0d094b1",
+      "bytes": 4058
+    },
+    {
+      "path": "src/nouveau/cubin/macos/libelf.h",
+      "base_sha256": null,
+      "source_sha256": "ad0ece56cd866e8f200d1f58f95417cadd31b54e8970d3b8492e9e765b8adca6",
+      "bytes": 2533
+    },
+    {
+      "path": "src/nouveau/cubin/macos/nv_libelf_mini.c",
+      "base_sha256": null,
+      "source_sha256": "a1518a0d62a158f06e827e0078c87f03411408d1a40e2d48772c08293bb1d8a8",
+      "bytes": 5977
+    },
+    {
+      "path": "src/nouveau/cubin/meson.build",
+      "base_sha256": "beec932c961156306c98c8daa7db69faf71f6de8450109d840c9e7023fd11a04",
+      "source_sha256": "cceb5c2938c82ba2dbbb594ce9475045e58897bba8f65e34b75c2766d10ae189",
+      "bytes": 620
+    },
+    {
+      "path": "src/nouveau/headers/nvtypes.h",
+      "base_sha256": "b6be17c9beccb86ea8b0c759b0c8129d6ee79334e73991d568d24baa09593aff",
+      "source_sha256": "86c4e320ea7767c29b105c97d3a1f45aecc11d82b134842e7b692294b73f5800",
+      "bytes": 396
+    },
+    {
+      "path": "src/nouveau/meson.build",
+      "base_sha256": "0fb5e331d767d9297e23b689fc525bfd1cf9520df758869468e1d35636e22224",
+      "source_sha256": "869c4607cd137b43c0ff040be67f4337a5133c7a84c194cdb695672098b24f7a",
+      "bytes": 466
+    },
+    {
+      "path": "src/nouveau/mme/meson.build",
+      "base_sha256": "76dbb1cedf9b24c6d538faa6779508baa786fd70e20a4333d518b2f1c35d7950",
+      "source_sha256": "837378d41a46120dcaae8ca7d8891be26b324591c046398bb5635c3c89b245fb",
+      "bytes": 3049
+    },
+    {
+      "path": "src/nouveau/vulkan/bvh/encode.comp",
+      "base_sha256": null,
+      "source_sha256": "697416cce572131c946bfe095ff10a4702f72ab6d3be561f8dd43d5b68af485a",
+      "bytes": 6704
+    },
+    {
+      "path": "src/nouveau/vulkan/bvh/meson.build",
+      "base_sha256": null,
+      "source_sha256": "6be76eba565820d4576da3cf442a555f7b2132f66b4feca2dce8538eff6faf2c",
+      "bytes": 1066
+    },
+    {
+      "path": "src/nouveau/vulkan/bvh/nvk_build_interface.h",
+      "base_sha256": null,
+      "source_sha256": "fde789c1d539a2d073eb6a2d77a13caab824a718fdcd4cd47fa0e659bbcdb67b",
+      "bytes": 398
+    },
+    {
+      "path": "src/nouveau/vulkan/meson.build",
+      "base_sha256": "dba09c188816a7958ab4b0f3eb06451b8cd4a27fe15befab2345ac4a1ac165f0",
+      "source_sha256": "8035df2e81080c04ae6b38ef0986f9fe032f60df053e05cee8e36738e04bde03",
+      "bytes": 10502
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_acceleration_structure.c",
+      "base_sha256": "48968bdcd307aafbdfa51240601949700c3e489a9a544207b1a778e0f4b19f9c",
+      "source_sha256": "9d69dd957c32ea496b54f055ac57d088701085b42b84f95716a6d3d5c47df7dc",
+      "bytes": 17831
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_buffer.c",
+      "base_sha256": "b60cb4a691984893c07b7f3d859fd11b2e1ea38ea57d734a17637a812ea6bd8b",
+      "source_sha256": "88b5c09e74d6317732c2b790e6c0f07fb1a18fc1616aa61a45c62b46b78ab4f3",
+      "bytes": 11552
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_bvh.h",
+      "base_sha256": null,
+      "source_sha256": "8503be67d0cb091082be9a002c8f8d338da931fda31e0975e2b63f1aad5902cf",
+      "bytes": 1958
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_cmd_buffer.c",
+      "base_sha256": "7ebb7e90207120472ae377d946b6f14a675817e9257930083921dadd7ac3e448",
+      "source_sha256": "79409deebb584ddacb5c8c91a954fb03b465e79e7f47bf2466001f7375035003",
+      "bytes": 56157
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_cmd_buffer.h",
+      "base_sha256": "8bc2074c6da6a42d8a7948335b9b9c47a215f7927c99a0bb0bb11e1ee0b6d55d",
+      "source_sha256": "2369ebc30384515be60143624e7cb8009eac2301ce0091c34623a3c8fa8c9fa5",
+      "bytes": 17753
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_cmd_dispatch.c",
+      "base_sha256": "2cae02506ab6d757dc94c44c51f08b9aa213ade9ab4746caf6ef3eac06a614a4",
+      "source_sha256": "86281ffd5cd5580ecc9a189b89d50e2994b3aafd3a34593ab41622cbd90b4d1a",
+      "bytes": 27851
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_cmd_draw.c",
+      "base_sha256": "eaa9ce187ac94e1d327e34d5b045eead3cc8ab230e8266536721878c4854050c",
+      "source_sha256": "113811aaaccd613146ba33356c7cc0ed82cfc1a4d67fa8ad4b9deb7d71d50aa6",
+      "bytes": 223337
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_cmd_pool.c",
+      "base_sha256": "38e3485bc1e83d27234f8236cc0fd6e920f13a83269a472c17899609983f07c0",
+      "source_sha256": "911bb4717981fb5b340fe378a7ec3a4834475237efda0d29e20514caef4cf13d",
+      "bytes": 6780
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_descriptor_set.c",
+      "base_sha256": "c849775aa0a23d294262c83733875fc6f86fb76c644bace1b215d0b0b8e9d212",
+      "source_sha256": "ade84ad00c4fe00868db6eac10d46da67c92856a9fc283d9084e151485405d96",
+      "bytes": 45451
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_descriptor_set_layout.c",
+      "base_sha256": "5808f42b508ba9badd3827ef71b080f77d50db8f3a21f40b802cf8aa92540811",
+      "source_sha256": "3cf43e9d881a91e45bf1b544366ec24875d6572bed6713d41cccb0b03e4c9e76",
+      "bytes": 22202
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_device.c",
+      "base_sha256": "0c118e8595ab9649ab39993e065e98da9c91ed3c0e48ef594c34d98c8584a8a8",
+      "source_sha256": "b6ff53803c6765bbd680053f3a9bd5e34b72db3f613d75ed943e8ba178380017",
+      "bytes": 17259
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_device.h",
+      "base_sha256": "276babbfebf6ce6ef32099a35929eb8b98d3dd57920b979d4644277d79f7624a",
+      "source_sha256": "35c082cbf8c9f1a00a57b1e5953b9eb59f728c2de82dd29a4f5d15ae3ed7bf35",
+      "bytes": 2608
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_device_memory.c",
+      "base_sha256": "797a7a75fcf10e3766d8f2f60cfd5b490751ecfc48709fd43240964b5308a1ea",
+      "source_sha256": "e55cb9efb2670d6075000b75431d01a13deca8ae168dda91daf2217f5aadade5",
+      "bytes": 23028
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_device_memory.h",
+      "base_sha256": "66dc33ec70703409a29f6136085c4aead37f92e54091659e12775a925b33b658",
+      "source_sha256": "07771c37a8ecd2788a67dc274318bc66c4e8cdc8ac96e637cdadaefafd3ee859",
+      "bytes": 716
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_image.c",
+      "base_sha256": "8fdace71b5cbd35e1664a11719664c6308837a1e6cf0f4f3d7203e97415c274e",
+      "source_sha256": "154c3b736e8e4ade60a14bd907bd682149f438bef9c0281f05ada3284fd0a56b",
+      "bytes": 86178
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_instance.c",
+      "base_sha256": "2e7d287d5a9e666a4e00f16636f47ef45348d7624c7016dce47980a41276be2a",
+      "source_sha256": "073115862400ae046220586badbdfd367c6092d1fa5e939edbb3263a3dae09e5",
+      "bytes": 8448
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_mem_stream.c",
+      "base_sha256": "104f3849c57e209d06e73fe9d248ec7b737f9725a757e8dc79ddcf05c86786a6",
+      "source_sha256": "fa11b19191e99723852ae9d96230f329b46078e5bec0ba751c8c572388228442",
+      "bytes": 9021
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_nir_lower_descriptors.c",
+      "base_sha256": "bd1a19bc4a0e2f8d6ae054cb3fffe9f40f634073fa6f379815e79f98efcb0d91",
+      "source_sha256": "07967f8f27dc106af6810cd89f22442be0bbf692a3695c3bbdcd4b4cc2e5ee3b",
+      "bytes": 54234
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_nir_lower_ray_queries.c",
+      "base_sha256": null,
+      "source_sha256": "1d8c627d8ca04feb0f63cdd435e330985ed039ccd71ee3e9fc05eb57c2e6cb3d",
+      "bytes": 27260
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_nir_ray_tracing.c",
+      "base_sha256": null,
+      "source_sha256": "2455d25b1dfc9db0fcac8e4e194400bceaf65abe90a7279d8da71d92c7741d84",
+      "bytes": 23631
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_nir_ray_tracing.h",
+      "base_sha256": null,
+      "source_sha256": "561328b5c89ed93eecfd7ea3569c36287b5fc3f8f003f8b536f60cb538a75061",
+      "bytes": 2444
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_physical_device.c",
+      "base_sha256": "c6f5fd841efd50dfa8398d983b10c011ea32474ae9419dc9fe942c4c24e99edf",
+      "source_sha256": "df4e4fd89f735d0f473cf469af3a0b2f70c93d49e749fefc8193f6740f2b1a70",
+      "bytes": 87632
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_physical_device.h",
+      "base_sha256": "7fd462669151e8e14beb6ceb9847a2ca95eb061df75f60b45772e191bd23c70c",
+      "source_sha256": "7e17ffa95a11cc3c4c4b8dd43e3ea608a1e5c090d42c5d477558fabd38a3e166",
+      "bytes": 2958
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_shader.c",
+      "base_sha256": "bbaa8bb7b648d51b9fa6aa3f9c69453d63c39069ab905fdd9465f7dbe399c721",
+      "source_sha256": "f7f7b60b534b85fbad2612987827db445850441e0b4425eb071055e98b6b5681",
+      "bytes": 64134
+    },
+    {
+      "path": "src/nouveau/vulkan/nvk_shader.h",
+      "base_sha256": "ccb7191d14d540f2c75659101f3ec90abc0702c9672ce2e78ed96a4b1a9996c2",
+      "source_sha256": "973ff3d4692dac17e5775f6f8b623a201ec228521007e4c4c2c6eaea0f3a04e1",
+      "bytes": 4988
+    },
+    {
+      "path": "src/nouveau/vulkan/nvkmd/nvkmd.c",
+      "base_sha256": "811edc03d5424f8000896f72e635036cb0a4a915395abf6e4d53098d49336c71",
+      "source_sha256": "12789850b7656d7c47c7da697bbed2ec4b2f54d6a4ff06f91b4ad2b59effd6b2",
+      "bytes": 15346
+    },
+    {
+      "path": "src/nouveau/vulkan/nvkmd/nvkmd.h",
+      "base_sha256": "1043ba2fb7e8f827d76e80b37221def6747c8a83b9a03c1e21908cd7d81d4413",
+      "source_sha256": "97dc51686845b7882eaa0899f937f59b82421078ec933b3582638fc6f54511b4",
+      "bytes": 19374
+    },
+    {
+      "path": "src/nouveau/vulkan/nvkmd/nvrm/class/README",
+      "base_sha256": null,
+      "source_sha256": "4dc075a031087ac33dbced796f7c309e777d7b669ef80df9c708ed7fd5b8fb9f",
+      "bytes": 144
+    },
+    {
+      "path": "src/nouveau/vulkan/nvkmd/nvrm/class/cla26f.h",
+      "base_sha256": null,
+      "source_sha256": "679ab558c758836420174a710bf1b36d2340a740ec9b7d6f51e2a02983e40815",
+      "bytes": 13476
+    },
+    {
+      "path": "src/nouveau/vulkan/nvkmd/nvrm/nv-haiku.h",
+      "base_sha256": null,
+      "source_sha256": "733e1ebc91aac61b277c01b0f58393efcebff3d93696ba5b1f1d846311fbce3f",
+      "bytes": 280
+    },
+    {
+      "path": "src/nouveau/vulkan/nvkmd/nvrm/nvRmApi.c",
+      "base_sha256": null,
+      "source_sha256": "99d403c113ecf287cae526cb5a5f7aa284bece575ecc4f666754fd93da2d10a5",
+      "bytes": 8030
+    },
+    {
+      "path": "src/nouveau/vulkan/nvkmd/nvrm/nvRmApi.h",
+      "base_sha256": null,
+      "source_sha256": "cc63ecec06eff80eb55a483658ed09e3e08402414df839870c9724edc8b64f6b",
+      "bytes": 2618
+    },
+    {
+      "path": "src/nouveau/vulkan/nvkmd/nvrm/nvRmSemSurf.c",
+      "base_sha256": null,
+      "source_sha256": "305339fa8419a6a64bf1b1e2e3c2bb69b5da5944a08e47fb4560056c20dfd733",
+      "bytes": 8489
+    },
+    {
+      "path": "src/nouveau/vulkan/nvkmd/nvrm/nvRmSemSurf.h",
+      "base_sha256": null,
+      "source_sha256": "fcf74d5b4da9c26134a5b2d2d4137d3af9f51c33660e2184b6aa343e57e90520",
+      "bytes": 1478
+    },
+    {
+      "path": "src/nouveau/vulkan/nvkmd/nvrm/nvkmd_nvrm.h",
+      "base_sha256": null,
+      "source_sha256": "cd13af0e1566a11d7efc9cb3cdcaeeacf34a72ac809a5e494a394cfef5dbc5c0",
+      "bytes": 8969
+    },
+    {
+      "path": "src/nouveau/vulkan/nvkmd/nvrm/nvkmd_nvrm_ctx.c",
+      "base_sha256": null,
+      "source_sha256": "6a0c13a52a21f7ff50e0f29ba5dac96164cb488f1d04790a9a2c6c403f62baf6",
+      "bytes": 53385
+    },
+    {
+      "path": "src/nouveau/vulkan/nvkmd/nvrm/nvkmd_nvrm_dev.c",
+      "base_sha256": null,
+      "source_sha256": "2377d7074623a31733a6f4df4d55b45fcbe85272668073277166db40ffe6bdf7",
+      "bytes": 3986
+    },
+    {
+      "path": "src/nouveau/vulkan/nvkmd/nvrm/nvkmd_nvrm_mem.c",
+      "base_sha256": null,
+      "source_sha256": "255abbf614c4d6cf53d9d30da7e7b569973df5285281311c892ec02041c5630a",
+      "bytes": 17245
+    },
+    {
+      "path": "src/nouveau/vulkan/nvkmd/nvrm/nvkmd_nvrm_pdev.c",
+      "base_sha256": null,
+      "source_sha256": "141e45b1db385defa8b2fa99be1f1ec8abae705440b7e4f9846cc7bd224a607c",
+      "bytes": 22119
+    },
+    {
+      "path": "src/nouveau/vulkan/nvkmd/nvrm/nvkmd_nvrm_sync.c",
+      "base_sha256": null,
+      "source_sha256": "657a4d2c2a3c0e3ebecdc8e7c21d309c9b0ee920bcc9c8ef0255c1f93b622ddc",
+      "bytes": 15763
+    },
+    {
+      "path": "src/nouveau/vulkan/nvkmd/nvrm/nvkmd_nvrm_va.c",
+      "base_sha256": null,
+      "source_sha256": "3eab52b881b5c900147a0f292fb0900cd724eb3888f515c7c014e5764e7c103e",
+      "bytes": 7219
+    },
+    {
+      "path": "src/nouveau/vulkan/nvkmd/nvrm/nvrm_surfshare_abi.h",
+      "base_sha256": null,
+      "source_sha256": "b48ef818e6ab80e3c820a5c23282576a0c1e6b43d5c89e38f41972f9ea4630d6",
+      "bytes": 1283
+    },
+    {
+      "path": "src/nouveau/vulkan/nvkmd/nvrm/nvrm_xnu.c",
+      "base_sha256": null,
+      "source_sha256": "900c1167a6d4a5b3b390953961666004bae77f13ef1dcfb4debe7a72c79962ec",
+      "bytes": 10039
+    },
+    {
+      "path": "src/nouveau/vulkan/nvkmd/nvrm/nvrm_xnu.h",
+      "base_sha256": null,
+      "source_sha256": "aafda56a8a2b4649fc1e32e322ba74175ce1459e9ac4cc38be85aadda01d82fe",
+      "bytes": 496
+    },
+    {
+      "path": "src/nouveau/vulkan/nvmtl_cfg.h",
+      "base_sha256": null,
+      "source_sha256": "338ceb60b8f2caef17e6fcc0108d6f622cf36f4ea23814319913315f71bbb7ea",
+      "bytes": 879
+    },
+    {
+      "path": "src/nouveau/vulkan/nvmtl_nvk_sass.c",
+      "base_sha256": null,
+      "source_sha256": "9c8de0ece372f4d1d0e7edf949b68d6be26701208f368d2b0ea4602431a3f825",
+      "bytes": 5550
+    },
+    {
+      "path": "src/nouveau/vulkan/nvmtl_sample_depth_contract.h",
+      "base_sha256": null,
+      "source_sha256": "8ae65d09d586df44f15dfbfb62f1b85e659c890d4f8bf5b52c48e1ecf762684d",
+      "bytes": 370
+    },
+    {
+      "path": "src/util/vma.c",
+      "base_sha256": "8ccc36526c99a5517634cd702f6ac80f740dac982255d279cd134a4b3151dac2",
+      "source_sha256": "6d1161c87b784a0d55257864742d6b95b88aa79889727eaab218836efa13b1a7",
+      "bytes": 11939
+    },
+    {
+      "path": "src/vulkan/runtime/vk_acceleration_structure.c",
+      "base_sha256": "38879996a2722f8c8cd383dc22ff82cd579062f74c67da2a8c2072a5705970d7",
+      "source_sha256": "edae5ada1e14768d31b900eb3896ffa8b0b993d9869fa7b6f6495fd454b13db1",
+      "bytes": 62042
+    },
+    {
+      "path": "src/vulkan/runtime/vk_device.c",
+      "base_sha256": "15d51d853484d85a5292a55cca2077cf1e195878fe6dd7c07c03172d14707cf7",
+      "source_sha256": "f0a0b52aad2daf6389e53c0b3c399beb4a8eb6c156806dbee030c8ef27f0e875",
+      "bytes": 32516
+    },
+    {
+      "path": "src/vulkan/runtime/vk_image.c",
+      "base_sha256": "e4b1d47916501c5076122f45344968429be318ea947cd0517638229c77c0f635",
+      "source_sha256": "b91e1f93d1fd3ad9c52a22a8e03549c24476716ccddb1daf4865008544afcbdb",
+      "bytes": 48336
+    },
+    {
+      "path": "src/vulkan/runtime/vk_image.h",
+      "base_sha256": "8fd4c7a5942d8d057ec9c55805469557a2b615a847f178ef9add9930fcc4d3a5",
+      "source_sha256": "44f6d306120e2dff4dd453dfc88561415f33e5f7c993a06c07eba624eba95df9",
+      "bytes": 16877
+    },
+    {
+      "path": "src/vulkan/wsi/wsi_common_wayland.c",
+      "base_sha256": "c5e4cef0b9530927f3507167ff1e6ec66c77096f429a2dfebd29788cd4e9d9e8",
+      "source_sha256": "a4e8eb517f845b2c0007e516c70b95d98fa63e0b68da02ef2cd0aec12af0e194",
+      "bytes": 161011
+    }
+  ],
+  "subproject_archives": [
+    {
+      "file": "paste-1.0.14.tar.gz",
+      "sha256": "de3145af08024dea9fa9914f381a17b8fc6034dfb00f3a84013f7ff43f29ed4c",
+      "size": 18157
+    },
+    {
+      "file": "proc-macro2-1.0.86.tar.gz",
+      "sha256": "5e719e8df665df0d1c8fbfd238015744736151d4445ec0836b8e628aae103b77",
+      "size": 48958
+    },
+    {
+      "file": "quote-1.0.35.tar.gz",
+      "sha256": "291ec9ab5efd934aaf503a6466c5d5251535d108ee747472c3977cc5acc868ef",
+      "size": 28136
+    },
+    {
+      "file": "rustc-hash-2.1.1.tar.gz",
+      "sha256": "357703d41365b4b27c590e3ed91eabb1b663f07c4c084095e60cbed4362dff0d",
+      "size": 14154
+    },
+    {
+      "file": "syn-2.0.87.tar.gz",
+      "sha256": "25aa4ce346d03a6dcd68dd8b4010bcb74e54e62c90c573f394c46eae99aba32d",
+      "size": 278076
+    },
+    {
+      "file": "unicode-ident-1.0.12.tar.gz",
+      "sha256": "3354b9ac3fae1ff6755cb6db53683adb661634f67557942dea4facebec0fee4b",
+      "size": 42168
+    }
+  ],
+  "ogkm_commit": "e4a5faa2567f28c8eabe0ebb6422b6d0abcf37eb",
+  "verification_scope": "All 81 patch output files against exact Mesa source archive. Archive and external dependencies are not redistributed."
+}

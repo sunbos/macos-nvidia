@@ -1,0 +1,303 @@
+{
+  "schema_version": 1,
+  "scope": "Selected values transcribed from fixed historical build records; original private logs and machine-specific paths are not included. These are input pins, not a portable build workflow.",
+  "nvrm_nvaccel": {
+    "base_commit": "c7dc26239bf85a648d5318fde135ebc09dc094a3",
+    "ogkm_repository": "https://github.com/NVIDIA/open-gpu-kernel-modules",
+    "ogkm_commit": "e4a5faa2567f28c8eabe0ebb6422b6d0abcf37eb",
+    "ogkm_release": "610.57.04",
+    "kdk": "26.7.1_25G241",
+    "sdk": "26.5",
+    "arch": "x86_64",
+    "compiler_version": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+    "build_entrypoints_in_patch": [
+      "build/build_nvrm_local.py",
+      "build/accel_build.sh"
+    ],
+    "complete_standalone_build_entry": false,
+    "original_source_snapshot_sha256": "10077b75e468c5e7286b5fc6bbf67a5c59b2a359c52d493b225a1cc6c7682cbd",
+    "original_source_diff_sha256": "10ce37cfd807d45939a3fafe4ee39c4d28d01f990aa3efe051b9949a44b24d45",
+    "gap": "Requires the full exact upstream tree, OGKM, Apple SDK/KDK, compatible IOKit headers and the recorded RM compiler-command/dependency environment. No new clean build or installation performed."
+  },
+  "nvmtl_observer": {
+    "base_commit_for_patch": "592b8df746371b523d5db0315f9794a57bff5c8e",
+    "frozen_source_files": 60,
+    "archived_plugin_source_files": 26,
+    "external_vulkan_header_files": 34,
+    "frozen_manifest_sha256": "cdce4cc2550b429243c5c22da182af879808dda61d85b71bbfc777f0369f23b9",
+    "historical_build_receipt_sha256": "df038dda2741b9d200b514153ac3840d9a8ff5be4a5e7bf02668ace6818a6a07",
+    "historical_builder_sha256": "1fbb42e9d4a19e5b03dbfd77361d133a0afcb96390a0ce98a08576027dba32c8",
+    "compiler_sha256": "f30550eab15fdf5ab8c0dc54c52679711241e5d4b636b027e18c09fef531775d",
+    "sdk_settings_sha256": "f8d005f09381389167f9e0aeaa169bc9e7dff162ef22ca2fd8e98df7ff1acafe",
+    "sdk": "26.5",
+    "arch": "x86_64",
+    "deployment_target": "26.0",
+    "compiler_options": [
+      "-bundle",
+      "-fobjc-arc",
+      "-O1",
+      "-DNVMTL_RELEASE=1",
+      "-Wno-protocol",
+      "-Wno-incomplete-implementation"
+    ],
+    "translation_unit": "plugin/NVMTLDevice.m",
+    "frameworks": [
+      "Foundation",
+      "Metal",
+      "IOSurface",
+      "IOKit"
+    ],
+    "unsigned_output_sha256": "fa6ba1e44a5e2cd8030fbb31f38b258c4db677b2c586df89636f2c8aae127486",
+    "signed_output_sha256": "eb3e77af519773eb12c3711cd9f10c8f980fca006e15f524851368eab10edc9b",
+    "complete_standalone_build_entry": false,
+    "gap": "Original build_static.py is not redistributed because it embeds local paths and historical staging policy. Build replaced only the main executable within an existing complete bundle; bundle resources, codecs and runtime dependencies remain separate inputs. Observer instrumentation is not a codec selection fix.",
+    "vulkan_headers": {
+      "repository": "https://github.com/KhronosGroup/Vulkan-Headers",
+      "commit": "ee2ec5fd83dafce291024683b50dc89219333076",
+      "files": [
+        {
+          "path": "Vulkan-Headers/include/vk_video/vulkan_video_codec_av1std.h",
+          "size": 16694,
+          "sha256": "c75c1d324b97d247aef0008024bc7f3adb98c741ab7f66c882ec38fdacc7ee33"
+        },
+        {
+          "path": "Vulkan-Headers/include/vk_video/vulkan_video_codec_av1std_decode.h",
+          "size": 4257,
+          "sha256": "7e3a1ce177c12546d410f3179ce1b81f2da7a8eba4f525b29cd563ab4099c0e5"
+        },
+        {
+          "path": "Vulkan-Headers/include/vk_video/vulkan_video_codec_av1std_encode.h",
+          "size": 5986,
+          "sha256": "8d166b4543260a38347860443b1a59c7a5e86cdb0d0facaf4c704f667de030e3"
+        },
+        {
+          "path": "Vulkan-Headers/include/vk_video/vulkan_video_codec_h264std.h",
+          "size": 13961,
+          "sha256": "fded484cef9f90fbbd089e0647268f36e5f4292179fbc5428a2c9e8d7709bbe9"
+        },
+        {
+          "path": "Vulkan-Headers/include/vk_video/vulkan_video_codec_h264std_decode.h",
+          "size": 2730,
+          "sha256": "37b970c3d80536ad1ac074cfe19b58ee03c3075378e02179e1dc5e4351266821"
+        },
+        {
+          "path": "Vulkan-Headers/include/vk_video/vulkan_video_codec_h264std_encode.h",
+          "size": 6885,
+          "sha256": "227e092b53c4e7ca1a948ed021704511c1ed16040cd6188ff6703e5ae66db64d"
+        },
+        {
+          "path": "Vulkan-Headers/include/vk_video/vulkan_video_codec_h265std.h",
+          "size": 23446,
+          "sha256": "0b81f8986ada015ef2e127449eff9d9634899bb59a0a9277a4054e9ec4416c12"
+        },
+        {
+          "path": "Vulkan-Headers/include/vk_video/vulkan_video_codec_h265std_decode.h",
+          "size": 2436,
+          "sha256": "879a0dd370a1b1ad184638906c52bdfe7d80d639fbc5a5baa8b02d7c5b60b147"
+        },
+        {
+          "path": "Vulkan-Headers/include/vk_video/vulkan_video_codec_h265std_encode.h",
+          "size": 7469,
+          "sha256": "abb3e72af22e4e0a3dbe5dff7be1b275949388809fb3987830341e8f495ea1c7"
+        },
+        {
+          "path": "Vulkan-Headers/include/vk_video/vulkan_video_codec_vp9std.h",
+          "size": 5391,
+          "sha256": "0a47125865376a3fe7014b69ff6db9d04e30ebf8c4d15664f1d894649ad5c09d"
+        },
+        {
+          "path": "Vulkan-Headers/include/vk_video/vulkan_video_codec_vp9std_decode.h",
+          "size": 2378,
+          "sha256": "1ceb1a8d0e3370e508cf688a6e57dc314cd82186b60f3cef420ea4b1b483865d"
+        },
+        {
+          "path": "Vulkan-Headers/include/vk_video/vulkan_video_codecs_common.h",
+          "size": 667,
+          "sha256": "d2e7caa396c521d03d491a269572b1d31b925b5127d22fda14199951ebae89f8"
+        },
+        {
+          "path": "Vulkan-Headers/include/vulkan/vk_icd.h",
+          "size": 8228,
+          "sha256": "ba22828f76de7231e7dfbb5d8564e7a58dd9f5dbeac8c1f0ff6c056c92db744a"
+        },
+        {
+          "path": "Vulkan-Headers/include/vulkan/vk_layer.h",
+          "size": 7182,
+          "sha256": "a9fb1343e7e1fa3456189bf146f2186b8df46c1b1a01f88f8b9ae4cd25b1623c"
+        },
+        {
+          "path": "Vulkan-Headers/include/vulkan/vk_platform.h",
+          "size": 2832,
+          "sha256": "a2cd9085c66776845d2524c3b0e73ccf4827ba046aa6f676c4b8ddbed47d6552"
+        },
+        {
+          "path": "Vulkan-Headers/include/vulkan/vulkan.h",
+          "size": 1620,
+          "sha256": "096f50152d0b298d8df84a561a37d8190c8a60af34dff0e2cc8328b24491a640"
+        },
+        {
+          "path": "Vulkan-Headers/include/vulkan/vulkan_android.h",
+          "size": 6337,
+          "sha256": "9dcce545a790b5b1ce00e103ade95c8efa4c8a0bf2ff39865d76a7d2f987aef2"
+        },
+        {
+          "path": "Vulkan-Headers/include/vulkan/vulkan_beta.h",
+          "size": 17419,
+          "sha256": "bb43577a445c357c3f0c03572b3dd3ebd9fca39914c0092f7d77e942af05d3fc"
+        },
+        {
+          "path": "Vulkan-Headers/include/vulkan/vulkan_core.h",
+          "size": 1362362,
+          "sha256": "a98e440889e790573a0f77c77bbc2d5b3de6fc33d066f879d4b2df2f11cf468b"
+        },
+        {
+          "path": "Vulkan-Headers/include/vulkan/vulkan_directfb.h",
+          "size": 1959,
+          "sha256": "efecf5a15380f61c16ef257ed55a998f2cc651789bec22056ccc81d2518daefc"
+        },
+        {
+          "path": "Vulkan-Headers/include/vulkan/vulkan_fuchsia.h",
+          "size": 12907,
+          "sha256": "17aedccaae68825bfa2954faec1bc9e953b106f1161e1b2ab26ab4cdccf21a06"
+        },
+        {
+          "path": "Vulkan-Headers/include/vulkan/vulkan_ggp.h",
+          "size": 1946,
+          "sha256": "b68cbbf19b9397ee63dd6ba94526059bd2ff000c66083243758e3a04e215bd2c"
+        },
+        {
+          "path": "Vulkan-Headers/include/vulkan/vulkan_ios.h",
+          "size": 1359,
+          "sha256": "ebaeffc3f4ec0484dcf34753678f1642caf73f6db4e17f11f1b82302151b918c"
+        },
+        {
+          "path": "Vulkan-Headers/include/vulkan/vulkan_macos.h",
+          "size": 1391,
+          "sha256": "3ae5522081741e9021be86727e11949ad8c695e66f75e1c422e577afd7657f59"
+        },
+        {
+          "path": "Vulkan-Headers/include/vulkan/vulkan_metal.h",
+          "size": 8073,
+          "sha256": "d5fe0caf881cc9c72ea2ba31ca86c684e97cdec6741d6e6298ecbd8f58dc8c5e"
+        },
+        {
+          "path": "Vulkan-Headers/include/vulkan/vulkan_ohos.h",
+          "size": 4113,
+          "sha256": "3cc40f845b5fd75cda0d8a3b1f2782522a3591657f67c656a211b4639eb23b16"
+        },
+        {
+          "path": "Vulkan-Headers/include/vulkan/vulkan_screen.h",
+          "size": 4200,
+          "sha256": "b9e7e7921b4be199c8ecfe518bd71bd8e533adbbab193714c542157b87b10e86"
+        },
+        {
+          "path": "Vulkan-Headers/include/vulkan/vulkan_ubm.h",
+          "size": 1878,
+          "sha256": "ac106317c017d1975f26184d3979dba0352f10aa1cfc7ef5373be92fef6bd137"
+        },
+        {
+          "path": "Vulkan-Headers/include/vulkan/vulkan_vi.h",
+          "size": 1332,
+          "sha256": "a53e35bb1b3113e6ef4932cb9358a27861a198d7865227ecd93555fecc73dd68"
+        },
+        {
+          "path": "Vulkan-Headers/include/vulkan/vulkan_wayland.h",
+          "size": 1959,
+          "sha256": "6c4146149d45bcbb5a22c7540feaa396ee9a49f077737c7a343c62de5199fbc7"
+        },
+        {
+          "path": "Vulkan-Headers/include/vulkan/vulkan_win32.h",
+          "size": 15764,
+          "sha256": "72f0b6de71287d3b04d12235e4f2fef8f343126f85be4963c516d31d5bb4c099"
+        },
+        {
+          "path": "Vulkan-Headers/include/vulkan/vulkan_xcb.h",
+          "size": 1973,
+          "sha256": "3d49f5eb52090e72e1cf7cde545088225ac524a2ff1d1f35737e7d944474c1b7"
+        },
+        {
+          "path": "Vulkan-Headers/include/vulkan/vulkan_xlib.h",
+          "size": 1954,
+          "sha256": "3c44e97d3f380eb912e01a79e9667457fdf5e18164f0b09b3c61431f421bc551"
+        },
+        {
+          "path": "Vulkan-Headers/include/vulkan/vulkan_xlib_xrandr.h",
+          "size": 1504,
+          "sha256": "188233d112d812cca1777cfa6c1585073f1f2b033fa08b2f11c8d0757fcc232e"
+        }
+      ]
+    }
+  },
+  "air_translator": {
+    "base_commit_for_patch": "592b8df746371b523d5db0315f9794a57bff5c8e",
+    "frozen_manifest_sha256": "2c057da60869c0875fa8cdf3d69db9ec224dfa708fa624b2a0a7ed39a6a371c4",
+    "original_frozen_file_count": 384,
+    "selected_source_file_count": 276,
+    "omitted_scope": "External test fixtures, tests, examples and documentation. No extracted commercial shader or benchmark data is redistributed.",
+    "rust": "1.90.0",
+    "historical_command": [
+      "cargo",
+      "build",
+      "--release",
+      "--offline",
+      "--locked"
+    ],
+    "historical_command_working_directory": "translator/wrapper",
+    "cargo_locks": [
+      "translator/translator/Cargo.lock",
+      "translator/wrapper/Cargo.lock"
+    ],
+    "unsigned_output_sha256": "7ff4254d02d323aec9cca88c9b941fb081a043052934d10ec570bdbfc15d224f",
+    "signed_output_sha256": "2b8ded4fab6f467790c9dfb094eeef99fdc9641dce3626be472c24b9cde03ecb",
+    "complete_standalone_build_entry": false,
+    "gap": "Both Cargo manifests and lockfiles are retained through the exact upstream base and patch. External Cargo registry/git cache, Rust, LLVM dependencies, linking/rpath and signing workflow are not a unified portable lock. The selected archive does not reproduce the entire historical test suite."
+  },
+  "nvk_mesa": {
+    "source_manifest": "manifests/nvk-mesa.json",
+    "tool_versions": {
+      "meson": "1.12.1",
+      "ninja": "1.13.2.git.kitware.jobserver-pipe-1",
+      "pkg-config": "2.5.1",
+      "bindgen": "bindgen 0.71.1",
+      "cbindgen": "cbindgen 0.29.2",
+      "rustc": "rustc 1.90.0 (1159e78c4 2025-09-14)",
+      "cargo": "cargo 1.90.0 (840b83a10 2025-07-30)",
+      "glslang": "Glslang Version: 11:16.6.0",
+      "cmake": "cmake version 3.31.6",
+      "llvm-config": "20.1.8",
+      "llvm-spirv": "Homebrew LLVM version 20.1.8",
+      "rustfmt": "rustfmt 1.8.0-stable (1159e78c47 2025-09-14)",
+      "SPIRV-Tools": "2026.4.1 (source release v2026.4)",
+      "llvm-spirv-source": "v20.1.6"
+    },
+    "original_build_script_sha256": "e35a67059e31dd88b71e57e1fab49e10f5a313f300d2de468dd691b56251c8a5",
+    "original_configure_script_sha256": "37cd1ff72c31f267a29a1a07195bd97fac6d8c86aaf6239c905907cd3f1d424f",
+    "original_env_script_sha256": "f6d128ff92f63c3039e0310388c256e6888f1b784eb0ffe838d77c67f2475c4d",
+    "build_target": "src/nouveau/vulkan/libvulkan_nouveau.dylib",
+    "configure_options": [
+      "-Dbuildtype=debugoptimized",
+      "-Dvulkan-drivers=nouveau",
+      "-Dgallium-drivers=",
+      "-Dplatforms=",
+      "-Degl=disabled",
+      "-Dglx=disabled",
+      "-Dglvnd=disabled",
+      "-Dllvm=disabled",
+      "-Dmesa-clc=system",
+      "-Dshared-glapi=disabled",
+      "-Dvulkan-layers=",
+      "-Dtools=",
+      "-Dbuild-tests=false",
+      "-Dexpat=disabled",
+      "-Dzstd=disabled",
+      "-Dlibunwind=disabled",
+      "-Dlmsensors=disabled",
+      "-Dvalgrind=disabled",
+      "-Dxlib-lease=disabled",
+      "-Dgallium-rusticl=false",
+      "-Dspirv-tools=disabled"
+    ],
+    "complete_standalone_build_entry": false,
+    "gap": "Historical scripts embed private absolute dependency paths and are not redistributed. Reconstruct the separately built mesa_clc, bindgen, LLVM/SPIRV, Rust, Meson/Ninja, OGKM and subproject inputs before attempting a build. Patch application is verified; no new source-to-installed-binary reproduction is claimed."
+  }
+}

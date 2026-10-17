@@ -1,0 +1,890 @@
+diff --git a/plugin/NVMTLDevice.m b/plugin/NVMTLDevice.m
+--- a/plugin/NVMTLDevice.m
++++ b/plugin/NVMTLDevice.m
+@@ -21,6 +21,8 @@
+ #include <time.h>
+ #include "nvmtl_sample_positions.h"
+ #include "nvmtl_log_failure.h"
++#include "nvmtl_registration_observation.h"
++#include "nvmtl_headless.h"
+ #include <sys/sysctl.h>
+ #ifndef NVMTL_RELEASE
+ #define NVMTL_RELEASE 0
+@@ -132,9 +134,13 @@
+ }
+ @interface MTLIOAccelDevice : NSObject
+ - (instancetype)initWithAcceleratorPort:(mach_port_t)port;
++- (BOOL)isHeadless;
+ @end
+ @protocol MTLDeviceSPI <NSObject> @end
+ @interface NVMTLDevice : MTLIOAccelDevice <MTLDevice, MTLDeviceSPI>
++{
++    BOOL _nvmtlHeadless;
++}
+ @end
+ #import "NVMTLObjects.h"
+ void nvmtl_vendor_compile_airs(NSDictionary<NSString *, NSString *> *airs,
+@@ -171,6 +177,8 @@
+ }
+ #include <dlfcn.h>
+ #include <libgen.h>
++#include <mach-o/dyld.h>
++#include <limits.h>
+ static void nvmtl_nvdec_register(void)
+ {
+     static dispatch_once_t once;
+@@ -199,30 +207,65 @@
+ }
+ static void nvmtl_nvenc_register(void)
+ {
+-    static dispatch_once_t once;
+-    dispatch_once(&once, ^{
+-        const char *me = getprogname();
+-        if (getenv("NVMTL_NO_NVENC")) { nvlog("nvenc: NVMTL_NO_NVENC set - not registering in %s", me); return; }
+-        if (!strcmp(me, "WindowServer")) return;
+-        typedef int32_t (*RegFn)(uint32_t, CFDictionaryRef, void *);
+-        RegFn reg = (RegFn)dlsym(RTLD_DEFAULT, "VTRegisterVideoEncoderWithInfo");
+-        if (!reg) { nvlog("nvenc: VideoToolbox is not loaded in %s - not registering", me); return; }
+-        Dl_info di;
+-        if (!dladdr((const void *)nvmtl_nvenc_register, &di) || !di.dli_fname) { nvlog("nvenc: dladdr failed - not registering"); return; }
+-        char dir[1024], path[1200];
+-        strlcpy(dir, di.dli_fname, sizeof dir);
+-        snprintf(path, sizeof path, "%s/libnvenc_h264.dylib", dirname(dir));
+-        void *h = dlopen(path, RTLD_NOW | RTLD_LOCAL);
+-        if (!h) { nvlog("nvenc: dlopen %s FAILED: %s", path, dlerror()); return; }
+-        void *fac = dlsym(h, "NVEncH264_CreateInstance");
+-        if (!fac) { nvlog("nvenc: %s has no NVEncH264_CreateInstance", path); return; }
+-        NSDictionary *info = @{ @"CMClassImplementationID": @"com.nvmtl.videoencoder.avc.nvenc",
+-                                @"CMClassImplementationName": @"NVIDIA NVENC H.264",
+-                                @"VTRating": @1000, @"VTIsHardwareAccelerated": @YES };
+-        int32_t st = reg('avc1', (__bridge CFDictionaryRef)info, fac);
+-        nvlog("nvenc: H.264 encoder %s in %s (VTRegisterVideoEncoderWithInfo -> %d, rating 1000, %s)",
+-              st ? "NOT registered" : "REGISTERED", me, (int)st, path);
+-    });
++    // 0 = retryable, 1 = registering, 2 = registered. Never wait from a loader path.
++    static _Atomic int state;
++    nvmtl_regobs_event("register_entry", atomic_load_explicit(&state, memory_order_relaxed), 0);
++    const char *me = getprogname();
++    if (!me || !strcmp(me, "WindowServer")) return;
++    if (getenv("NVMTL_NO_NVENC")) { nvmtl_regobs_event("disabled", 0, 0); nvlog("nvenc: NVMTL_NO_NVENC set - not registering in %s", me); return; }
++    typedef int32_t (*RegFn)(uint32_t, CFDictionaryRef, void *);
++    RegFn reg = (RegFn)dlsym(RTLD_DEFAULT, "VTRegisterVideoEncoderWithInfo");
++    nvmtl_regobs_symbol((const void *)reg);
++    // Loading the plugin before VT must not consume the later device-path attempt.
++    if (!reg) { nvlog("nvenc: VideoToolbox is not loaded in %s - not registering", me); return; }
++    int expected = 0;
++    if (!atomic_compare_exchange_strong_explicit(&state, &expected, 1,
++            memory_order_acq_rel, memory_order_acquire)) { nvmtl_regobs_event("state_busy", expected, 0); return; }
++    Dl_info di;
++    if (!dladdr((const void *)nvmtl_nvenc_register, &di) || !di.dli_fname) {
++        nvlog("nvenc: dladdr failed - not registering"); goto retry;
++    }
++    char dir[1024], path[1200];
++    if (strlcpy(dir, di.dli_fname, sizeof dir) >= sizeof dir) goto retry;
++    int n = snprintf(path, sizeof path, "%s/libnvenc_h264.dylib", dirname(dir));
++    if (n < 0 || (size_t)n >= sizeof path) goto retry;
++    void *h = dlopen(path, RTLD_NOW | RTLD_LOCAL);
++    if (!h) { nvlog("nvenc: dlopen %s FAILED: %s", path, dlerror()); goto retry; }
++    void *fac = dlsym(h, "NVEncH264_CreateInstance");
++    if (!fac) { nvlog("nvenc: %s has no NVEncH264_CreateInstance", path); goto retry; }
++    int rating = 1000;
++    CFNumberRef ratingValue = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &rating);
++    if (!ratingValue) goto retry;
++    const void *keys[] = { CFSTR("CMClassImplementationID"), CFSTR("CMClassImplementationName"),
++                           CFSTR("VTRating"), CFSTR("VTIsHardwareAccelerated") };
++    const void *values[] = { CFSTR("com.nvmtl.videoencoder.avc.nvenc"), CFSTR("NVIDIA NVENC H.264"),
++                             ratingValue, kCFBooleanTrue };
++    CFDictionaryRef info = CFDictionaryCreate(kCFAllocatorDefault, keys, values, 4,
++                                               &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
++    CFRelease(ratingValue);
++    if (!info) goto retry;
++    unsigned obs_call = nvmtl_regobs_call();
++    int32_t st = reg('avc1', info, fac);
++    CFRelease(info);
++    nvlog("nvenc: H.264 encoder %s in %s (VTRegisterVideoEncoderWithInfo -> %d, rating 1000, %s)",
++          st ? "NOT registered" : "REGISTERED", me, (int)st, path);
++    atomic_store_explicit(&state, st ? 0 : 2, memory_order_release);
++    nvmtl_regobs_result(obs_call, st);
++    return;
++retry:
++    atomic_store_explicit(&state, 0, memory_order_release);
++    nvmtl_regobs_event("retryable_exit", 0, 0);
++}
++static void nvmtl_nvenc_register_after_config(void)
++{
++    // Codec discovery permission does not grant a Metal device or broaden its allowlist.
++    char executable[PATH_MAX], canonical[PATH_MAX];
++    uint32_t size = sizeof executable;
++    if (_NSGetExecutablePath(executable, &size) != 0 || !realpath(executable, canonical)) return;
++    if (strcmp(canonical, "/Applications/VideoProc Converter AI.app/Contents/Frameworks/ffmpeg")) return;
++    nvmtl_regobs_begin(canonical);
++    nvmtl_nvenc_register();
++    nvmtl_regobs_finish();
+ }
+ static void nvmtl_nvdec_hevc_register(void)
+ {
+@@ -343,8 +386,14 @@
+ }
+ - (instancetype)initWithAcceleratorPort:(mach_port_t)port {
+     nvlog("-[NVMTLDevice initWithAcceleratorPort:%u] in %s", port, getprogname());
++    const BOOL headless = nvmtl_accelerator_is_headless(port);
+     self = [super initWithAcceleratorPort:port];
+     if (!self) { nvlog("  super initWithAcceleratorPort: returned nil"); return nil; }
++    _nvmtlHeadless = headless;
++    if (!nvmtl_headless_allows_process(headless, getprogname())) {
++        nvlog("  headless accelerator: no display device for %s", getprogname() ?: "unknown process");
++        return nil;
++    }
+     if (!nvmtl_process_is_allowed()) { nvlog("  not allow-listed: no device for %s", getprogname()); return nil; }
+     nvlog("MTLIOAccelDevice's initWithAcceleratorPort: -> %p", (__bridge void *)self);
+     gNVMTLMainDevice = self;
+@@ -367,6 +416,10 @@
+         #undef NVMTL_U
+     } else nvlog("limits: -initLimits not found - every table-served limit stays 0 (CoreImage will refuse renders)");
+     return self;
++}
++
++- (BOOL)isHeadless {
++    return _nvmtlHeadless || [super isHeadless];
+ }
+ 
+ - (void)nvmtlProbeGPUPass {
+diff --git a/plugin/NVMTLLibraryLoad.m b/plugin/NVMTLLibraryLoad.m
+--- a/plugin/NVMTLLibraryLoad.m
++++ b/plugin/NVMTLLibraryLoad.m
+@@ -628,18 +628,20 @@
+     NSMutableSet<NSString *> *declared = [NSMutableSet new], *defined = [NSMutableSet new];
+     NSMutableSet *seen = [NSMutableSet new];
+     for (NSString *fn in airs) {
+-        NSString *ll = airs[fn];
+-        if (!ll) continue;
+-        NSValue *key = [NSValue valueWithPointer:(__bridge const void *)ll];
+-        if ([seen containsObject:key]) continue;
+-        [seen addObject:key];
+-        [ll enumerateLinesUsingBlock:^(NSString *line, BOOL *stop) {
+-            BOOL isDecl = [line hasPrefix:@"declare"];
+-            if (!isDecl && ![line hasPrefix:@"define"]) return;
+-            NSString *sym = nvmtl_sym_at(line);
+-            if (!sym.length || [sym hasPrefix:@"air."] || [sym hasPrefix:@"llvm."]) return;
+-            [(isDecl ? declared : defined) addObject:sym];
+-        }];
++        @autoreleasepool {
++            NSString *ll = airs[fn];
++            if (!ll) continue;
++            NSValue *key = [NSValue valueWithPointer:(__bridge const void *)ll];
++            if ([seen containsObject:key]) continue;
++            [seen addObject:key];
++            [ll enumerateLinesUsingBlock:^(NSString *line, BOOL *stop) {
++                BOOL isDecl = [line hasPrefix:@"declare"];
++                if (!isDecl && ![line hasPrefix:@"define"]) return;
++                NSString *sym = nvmtl_sym_at(line);
++                if (!sym.length || [sym hasPrefix:@"air."] || [sym hasPrefix:@"llvm."]) return;
++                [(isDecl ? declared : defined) addObject:sym];
++            }];
++        }
+     }
+     [declared minusSet:defined];
+     return declared.allObjects;
+@@ -740,6 +742,40 @@
+     return spvData;
+ }
+ 
++@interface NVMTLLazyAirs : NSDictionary { NSDictionary *_slot; NSArray *_blob; NSMutableArray *_text; os_unfair_lock _lk; }
++- (instancetype)initWithSlots:(NSDictionary *)slot blobs:(NSArray *)blob;
++- (NSUInteger)blobBytes;
++@end
++
++// Keep small metadata independent of substrings that may share an entire IR backing store.
++static NSString *nvmtl_cold_metadata_string(NSString *value) {
++    const char *bytes = value.UTF8String;
++    if (!bytes) return [value copy];
++    return [[NSString alloc] initWithBytes:bytes length:[value lengthOfBytesUsingEncoding:NSUTF8StringEncoding]
++                                 encoding:NSUTF8StringEncoding] ?: [value copy];
++}
++static NSArray<NSString *> *nvmtl_cold_metadata_names(NSArray<NSString *> *names) {
++    NSMutableArray *owned = [NSMutableArray arrayWithCapacity:names.count];
++    for (NSString *name in names) [owned addObject:nvmtl_cold_metadata_string(name)];
++    return [owned copy];
++}
++static NSNumber *nvmtl_cold_blob(NSData *air, NSString *ll, NSMutableArray *blobs, NSMutableArray *symbols) {
++    NSMutableSet *declared = [NSMutableSet new], *defined = [NSMutableSet new];
++    [ll enumerateLinesUsingBlock:^(NSString *line, BOOL *stop) {
++        @autoreleasepool {
++            BOOL isDecl = [line hasPrefix:@"declare"];
++            if (!isDecl && ![line hasPrefix:@"define"]) return;
++            NSString *sym = nvmtl_sym_at(line);
++            if (!sym.length || [sym hasPrefix:@"air."] || [sym hasPrefix:@"llvm."]) return;
++            [(isDecl ? declared : defined) addObject:nvmtl_cold_metadata_string(sym)];
++        }
++    }];
++    NSNumber *slot = @(blobs.count);
++    [blobs addObject:air];
++    [symbols addObject:@[[declared copy], [defined copy]]];
++    return slot;
++}
++
+ NSDictionary<NSString *, NSData *> *nvmtl_index_metallib_uncached(NSData *lib, NSDictionary **stageOut, NSDictionary **airOut, NSMutableArray *rec)
+ {
+     if (stageOut) *stageOut = nil;
+@@ -747,48 +783,71 @@
+     if (!nvmtl_xlate_ready()) return nil;
+     NSMutableDictionary<NSString *, NSData *> *out = [NSMutableDictionary dictionary];
+     NSMutableDictionary *stages = [NSMutableDictionary new], *airs = [NSMutableDictionary new];
++    const BOOL lazy = !getenv("NVMTL_NO_LAZYAIR");
++    NSMutableArray *blobs = lazy ? [NSMutableArray new] : nil, *symbols = lazy ? [NSMutableArray new] : nil;
+     const uint8_t *b = lib.bytes; NSUInteger n = lib.length, found = 0, visible = 0;
+     for (NSUInteger i = 0; i + 20 <= n; i++) {
+         if (!(b[i] == 0xde && b[i+1] == 0xc0 && b[i+2] == 0x17 && b[i+3] == 0x0b)) continue;
+         uint32_t off = 0, size = 0;
+         memcpy(&off, b + i + 8, 4); memcpy(&size, b + i + 12, 4);
+         if ((NSUInteger)off + size == 0 || i + off + size > n) continue;
+-        found++;
+-        NSData *air = [NSData dataWithBytes:b + i length:off + size];
+-        NSString *ll = nvmtl_air_to_text(air);
+-        if (!ll) continue;
+-        NSString *name = nil, *stage = nil;
+-        if (!nvmtl_entry_of(ll, &name, &stage)) {
+-            NSArray<NSString *> *vis = nvmtl_visible_of(ll);
+-            for (NSString *v in vis) { airs[v] = ll; stages[v] = @"visible"; }
+-            if (vis.count) [rec addObject:@[@(i), vis, @"visible"]];
+-            if (vis.count) { visible += vis.count; continue; }
+-            if (n > 0x0A && memcmp(b, "MTLB", 4) == 0 && b[0x0A] == 2) {
+-                NSArray<NSString *> *ex = nvmtl_exported_defs(ll);
+-                for (NSString *v in ex) { airs[v] = ll; stages[v] = @"visible"; }
+-                if (ex.count) {
+-                    [rec addObject:@[@(i), ex, @"visible"]];
+-                    visible += ex.count;
+-                    nvlog("library: dynamic-library blob %lu exports %lu function(s): %s", (unsigned long)found,
+-                          (unsigned long)ex.count, [[ex componentsJoinedByString:@","] UTF8String]);
+-                    continue;
++        @autoreleasepool {
++            found++;
++            NSData *air = [NSData dataWithBytes:b + i length:off + size];
++            NSString *ll = nvmtl_air_to_text(air);
++            if (!ll) continue;
++            NSString *name = nil, *stage = nil;
++            if (!nvmtl_entry_of(ll, &name, &stage)) {
++                NSArray<NSString *> *vis = nvmtl_visible_of(ll);
++                id value = ll;
++                if (lazy && vis.count) { vis = nvmtl_cold_metadata_names(vis); value = nvmtl_cold_blob(air, ll, blobs, symbols); }
++                for (NSString *v in vis) { airs[v] = value; stages[v] = @"visible"; }
++                if (vis.count) [rec addObject:@[@(i), vis, @"visible"]];
++                if (vis.count) { visible += vis.count; continue; }
++                if (n > 0x0A && memcmp(b, "MTLB", 4) == 0 && b[0x0A] == 2) {
++                    NSArray<NSString *> *ex = nvmtl_exported_defs(ll);
++                    id value = ll;
++                    if (lazy && ex.count) { ex = nvmtl_cold_metadata_names(ex); value = nvmtl_cold_blob(air, ll, blobs, symbols); }
++                    for (NSString *v in ex) { airs[v] = value; stages[v] = @"visible"; }
++                    if (ex.count) {
++                        [rec addObject:@[@(i), ex, @"visible"]];
++                        visible += ex.count;
++                        nvlog("library: dynamic-library blob %lu exports %lu function(s): %s", (unsigned long)found,
++                              (unsigned long)ex.count, [[ex componentsJoinedByString:@","] UTF8String]);
++                        continue;
++                    }
+                 }
++                nvlog("library: blob %lu has no air entry-point metadata and no visible functions", (unsigned long)found);
++                continue;
+             }
+-            nvlog("library: blob %lu has no air entry-point metadata and no visible functions", (unsigned long)found);
+-            continue;
+-        }
+-        out[name] = air;
+-        stages[name] = stage;
+-        airs[name] = ll;
+-        [rec addObject:@[@(i), name, stage]];
+-        i += off + size - 1;
++            id value = ll;
++            if (lazy) { name = nvmtl_cold_metadata_string(name); value = nvmtl_cold_blob(air, ll, blobs, symbols); }
++            out[name] = air;
++            stages[name] = stage;
++            airs[name] = value;
++            [rec addObject:@[@(i), name, stage]];
++            i += off + size - 1;
++        }
+     }
+     nvlog("library: metallib %lu bytes, %lu bitcode blobs, %lu entries indexed, %lu visible"
+           " | aircache %lu hit, %lu miss, %lu stored | spvcache %lu hit, %lu miss, %lu stored (%s)",
+           (unsigned long)n, (unsigned long)found, (unsigned long)out.count, (unsigned long)visible,
+           gAirHit, gAirMiss, gAirStored, gSpvHit, gSpvMiss, gSpvStored, nvmtl_aircache_dir().UTF8String);
+     if (stageOut) *stageOut = [stages copy];
+-    if (airOut) *airOut = [airs copy];
++    if (airOut) {
++        if (lazy) {
++            NSDictionary *indexed = [[NVMTLLazyAirs alloc] initWithSlots:airs blobs:blobs];
++            NSMutableSet *declared = [NSMutableSet new], *defined = [NSMutableSet new];
++            // Last assignment of each name wins. Fully shadowed modules must contribute neither set.
++            for (NSNumber *slot in [NSSet setWithArray:airs.allValues]) {
++                NSArray *pair = symbols[slot.unsignedIntegerValue];
++                [declared unionSet:pair[0]]; [defined unionSet:pair[1]];
++            }
++            [declared minusSet:defined];
++            objc_setAssociatedObject(indexed, &gExternsKey, declared.allObjects, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
++            *airOut = indexed;
++        } else *airOut = [airs copy];
++    }
+     return (out.count || visible) ? [out copy] : nil;
+ }
+ 
+@@ -798,10 +857,6 @@
+     return [nvmtl_aircache_dir() stringByAppendingPathComponent:[h stringByAppendingString:@".plist"]];
+ }
+ static _Atomic unsigned long gLazyLibs, gLazyNames, gLazyForced, gLazyFail;
+-@interface NVMTLLazyAirs : NSDictionary { NSDictionary *_slot; NSArray *_blob; NSMutableArray *_text; os_unfair_lock _lk; }
+-- (instancetype)initWithSlots:(NSDictionary *)slot blobs:(NSArray *)blob;
+-- (NSUInteger)blobBytes;
+-@end
+ @implementation NVMTLLazyAirs
+ - (instancetype)initWithObjects:(const id [])o forKeys:(const id<NSCopying> [])k count:(NSUInteger)n { return self; }
+ - (instancetype)initWithSlots:(NSDictionary *)slot blobs:(NSArray *)blob {
+@@ -810,7 +865,7 @@
+     _text = [NSMutableArray arrayWithCapacity:blob.count];
+     for (NSUInteger i = 0; i < blob.count; i++) [_text addObject:(id)kCFNull];
+     const unsigned long libs = atomic_fetch_add(&gLazyLibs, 1) + 1; atomic_fetch_add(&gLazyNames, slot.count);
+-    if (!(libs & (libs - 1))) nvlog("lazy air: %lu disk-indexed libraries hold %lu names, %lu texts decoded on first use, %lu failed",
++    if (!(libs & (libs - 1))) nvlog("lazy air: %lu lazy-indexed libraries hold %lu names, %lu texts decoded on first use, %lu failed",
+                                     libs, atomic_load(&gLazyNames), atomic_load(&gLazyForced), atomic_load(&gLazyFail));
+     return self;
+ }
+@@ -837,7 +892,7 @@
+     if (_text[i] == (id)kCFNull) { _text[i] = ll; atomic_fetch_add(&gLazyForced, 1); } else ll = _text[i];
+     os_unfair_lock_unlock(&_lk);
+     const unsigned long f = atomic_load(&gLazyForced);
+-    if (!(f & (f - 1))) nvlog("lazy air: %lu texts decoded on first use across %lu disk-indexed libraries holding %lu names (%lu failed)",
++    if (!(f & (f - 1))) nvlog("lazy air: %lu texts decoded on first use across %lu lazy-indexed libraries holding %lu names (%lu failed)",
+                               f, atomic_load(&gLazyLibs), atomic_load(&gLazyNames), atomic_load(&gLazyFail));
+     return ll;
+ }
+diff --git a/plugin/NVMTLObjects.m b/plugin/NVMTLObjects.m
+--- a/plugin/NVMTLObjects.m
++++ b/plugin/NVMTLObjects.m
+@@ -98,7 +98,7 @@
+       unsetenv("NVMTL_CONF_SET"); }
+     char recbuf[2048]; size_t recn = 0; recbuf[0] = 0;
+     FILE *f = fopen("/Library/GPUBundles/nvmtl/nvrm610.conf", "r");
+-    if (!f) { if (forgot) nvlog("conf: forgot %u inherited knob(s); no conf file", forgot); return; }
++    if (!f) { if (forgot) nvlog("conf: forgot %u inherited knob(s); no conf file", forgot); nvmtl_nvenc_register_after_config(); return; }
+     char line[512];
+     unsigned took = 0;
+     while (fgets(line, sizeof line, f)) {
+@@ -122,6 +122,7 @@
+     fclose(f);
+     if (recn) setenv("NVMTL_CONF_SET", recbuf, 1);
+     if (took || forgot) nvlog("conf: %u knob(s) read from /Library/GPUBundles/nvmtl/nvrm610.conf, %u inherited conf knob(s) forgotten first (the environment still wins)", took, forgot);
++    nvmtl_nvenc_register_after_config();
+ }
+ static int nvmtl_dontcare_clears(void) {
+     static int on = -1;
+diff --git a/plugin/nvmtl_allocation_census.h b/plugin/nvmtl_allocation_census.h
+new file mode 100644
+--- /dev/null
++++ b/plugin/nvmtl_allocation_census.h
+@@ -0,0 +1,38 @@
++#ifndef NVMTL_ALLOCATION_CENSUS_H
++#define NVMTL_ALLOCATION_CENSUS_H
++#include <stdint.h>
++#include <stddef.h>
++#define NVMTL_CENSUS_CAPACITY 4096u
++enum { NVC_OWNED, NVC_IMPORT_HOST, NVC_IMPORT_FD, NVC_UNCLASSIFIED, NVC_IMPORT_KINDS };
++/* API memory type classification; physical placement is always unknown. */
++enum { NVC_PHYSICAL_PLACEMENT_UNKNOWN = 0 };
++enum { NVC_DEVICE_LOCAL, NVC_NONLOCAL, NVC_LOCATION_UNKNOWN, NVC_LOCATIONS };
++enum { NVC_EMPTY, NVC_LIVE, NVC_FREE_PENDING, NVC_RETIRED };
++enum { NVC_CAPACITY=1u, NVC_OVERFLOW=2u, NVC_UNKNOWN_FREE=4u, NVC_DUPLICATE=8u,
++       NVC_METADATA=16u, NVC_OUTPUT_SHORT=32u, NVC_BAD_RESULT=64u };
++typedef struct {
++    uintptr_t device, memory;
++    uint64_t generation, allocation_sequence, size;
++    uint32_t type_index, heap_index, properties, heap_flags, import_kind, location, state, line;
++    const char *function;
++    const char *free_function;
++    uint32_t free_line;
++} nvmtl_census_row;
++typedef struct {
++    uint64_t live_bytes, pending_bytes, peak_live_bytes, allocated_bytes, freed_api_bytes;
++    uint64_t live_count, pending_count;
++} nvmtl_census_bucket;
++typedef struct {
++    uint32_t version, enabled, complete, flags, capacity, row_count, rows_written;
++    uint32_t physical_placement;
++    uint64_t sequence, allocation_calls, allocation_successes, allocation_failures;
++    uint64_t free_calls, null_frees, unknown_frees, duplicate_operations, untracked_successes;
++    int32_t last_failure_result;
++    nvmtl_census_row last_failure_request;
++    nvmtl_census_bucket buckets[NVC_IMPORT_KINDS][NVC_LOCATIONS];
++} nvmtl_census_snapshot;
++/* begin: 0 started, 1 already started, -1 wrapper in flight. No reset/restart. */
++int nvmtl_vk_census_begin(void);
++/* Aggregate plus active/pending rows; insufficient row capacity is sticky incomplete. */
++int nvmtl_vk_census_snapshot(nvmtl_census_snapshot *out, nvmtl_census_row *rows, size_t capacity);
++#endif
+diff --git a/plugin/nvmtl_allocation_census.inc b/plugin/nvmtl_allocation_census.inc
+new file mode 100644
+--- /dev/null
++++ b/plugin/nvmtl_allocation_census.inc
+@@ -0,0 +1,206 @@
++/* Included after the real PFN declarations and before the call-site macros.
++ * CPU-only candidate: fixed storage, no I/O, allocation, driver calls or sampling.
++ * All byte counters describe observed API requests, never physical residency.
++ */
++#include "nvmtl_allocation_census.h"
++#include <pthread.h>
++#include <string.h>
++static pthread_mutex_t nvc_lock = PTHREAD_MUTEX_INITIALIZER;
++static nvmtl_census_snapshot nvc_totals;
++static nvmtl_census_row nvc_rows[NVMTL_CENSUS_CAPACITY];
++static uint64_t nvc_inflight, nvc_generation;
++
++static void nvc_flag(uint32_t flag) { nvc_totals.flags |= flag; }
++static void nvc_add(uint64_t *value, uint64_t amount)
++{
++    if (UINT64_MAX - *value < amount) { *value = UINT64_MAX; nvc_flag(NVC_OVERFLOW); }
++    else *value += amount;
++}
++static void nvc_sub(uint64_t *value, uint64_t amount)
++{
++    if (*value < amount) { *value = 0; nvc_flag(NVC_OVERFLOW); }
++    else *value -= amount;
++}
++static nvmtl_census_bucket *nvc_bucket(const nvmtl_census_row *row)
++{
++    return &nvc_totals.buckets[row->import_kind][row->location];
++}
++/* Called while locked; memory properties must already be initialized and stable.
++ * Only the allocation chains in this pinned source are understood. Unknown
++ * extensions are classified UNCLASSIFIED and make metadata incomplete, never OWNED.
++ */
++static nvmtl_census_row nvc_request(VkDevice device, const VkMemoryAllocateInfo *info,
++                                  const char *function, uint32_t line)
++{
++    nvmtl_census_row row = {0};
++    row.device = (uintptr_t)device; row.function = function; row.line = line;
++    row.heap_index = UINT32_MAX; row.type_index = UINT32_MAX;
++    row.location = NVC_LOCATION_UNKNOWN;
++    if (!info) { row.import_kind = NVC_UNCLASSIFIED; nvc_flag(NVC_METADATA); return row; }
++    row.size = info->allocationSize; row.type_index = info->memoryTypeIndex;
++    if (info->sType != VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO) nvc_flag(NVC_METADATA);
++    if (row.type_index < g_memp.memoryTypeCount && row.type_index < VK_MAX_MEMORY_TYPES) {
++        row.properties = g_memp.memoryTypes[row.type_index].propertyFlags;
++        row.heap_index = g_memp.memoryTypes[row.type_index].heapIndex;
++        row.location = (row.properties & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ? NVC_DEVICE_LOCAL : NVC_NONLOCAL;
++        if (row.heap_index < g_memp.memoryHeapCount && row.heap_index < VK_MAX_MEMORY_HEAPS)
++            row.heap_flags = g_memp.memoryHeaps[row.heap_index].flags;
++        else nvc_flag(NVC_METADATA);
++    } else nvc_flag(NVC_METADATA);
++    const VkBaseInStructure *link = (const VkBaseInStructure *)info->pNext;
++    unsigned imports = 0, count = 0;
++    while (link && count++ < 32) {
++        unsigned kind = NVC_OWNED;
++        switch (link->sType) {
++        case VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO: break;
++        case VK_STRUCTURE_TYPE_IMPORT_MEMORY_HOST_POINTER_INFO_EXT: kind = NVC_IMPORT_HOST; break;
++        case VK_STRUCTURE_TYPE_IMPORT_MEMORY_FD_INFO_KHR: kind = NVC_IMPORT_FD; break;
++        default: kind = NVC_UNCLASSIFIED; nvc_flag(NVC_METADATA); break;
++        }
++        if (kind != NVC_OWNED) {
++            if (++imports > 1) { row.import_kind = NVC_UNCLASSIFIED; nvc_flag(NVC_METADATA); }
++            else row.import_kind = kind;
++        }
++        link = link->pNext;
++    }
++    if (link) { row.import_kind = NVC_UNCLASSIFIED; nvc_flag(NVC_METADATA); }
++    return row;
++}
++
++int nvmtl_vk_census_begin(void)
++{
++    pthread_mutex_lock(&nvc_lock);
++    int result = nvc_totals.enabled ? 1 : (nvc_inflight ? -1 : 0);
++    if (!result) nvc_totals.enabled = 1;
++    pthread_mutex_unlock(&nvc_lock);
++    return result;
++}
++
++int nvmtl_vk_census_snapshot(nvmtl_census_snapshot *out, nvmtl_census_row *rows, size_t capacity)
++{
++    pthread_mutex_lock(&nvc_lock);
++    if (!out || (!rows && capacity)) {
++        nvc_flag(NVC_OUTPUT_SHORT); pthread_mutex_unlock(&nvc_lock); return -1;
++    }
++    uint32_t count = 0, written = 0;
++    for (size_t i = 0; i < NVMTL_CENSUS_CAPACITY; ++i) {
++        if (nvc_rows[i].state != NVC_LIVE && nvc_rows[i].state != NVC_FREE_PENDING) continue;
++        ++count;
++        if (written < capacity) rows[written++] = nvc_rows[i];
++    }
++    if (written != count) nvc_flag(NVC_OUTPUT_SHORT);
++    *out = nvc_totals;
++    out->version = 1; out->capacity = NVMTL_CENSUS_CAPACITY;
++    out->row_count = count; out->rows_written = written;
++    out->complete = out->enabled && !out->flags;
++    out->physical_placement = NVC_PHYSICAL_PLACEMENT_UNKNOWN;
++    pthread_mutex_unlock(&nvc_lock);
++    return 0;
++}
++
++static VkResult nvmtl_census_allocate(VkDevice device, const VkMemoryAllocateInfo *info,
++                                     const VkAllocationCallbacks *allocator, VkDeviceMemory *out,
++                                     const char *function, uint32_t line)
++{
++    pthread_mutex_lock(&nvc_lock);
++    nvc_add(&nvc_inflight, 1);
++    int enabled = nvc_totals.enabled;
++    nvmtl_census_row row = {0};
++    if (enabled) {
++        nvc_add(&nvc_totals.allocation_calls, 1);
++        row = nvc_request(device, info, function, line);
++    }
++    pthread_mutex_unlock(&nvc_lock);
++    VkResult result = pvkAllocateMemory(device, info, allocator, out);
++    pthread_mutex_lock(&nvc_lock);
++    nvc_sub(&nvc_inflight, 1);
++    if (enabled) {
++        nvc_add(&nvc_totals.sequence, 1);
++        if (result != VK_SUCCESS) {
++            /* A failed Vulkan allocation leaves *out undefined: never read it. */
++            nvc_add(&nvc_totals.allocation_failures, 1);
++            nvc_totals.last_failure_result = result;
++            nvc_totals.last_failure_request = row;
++        } else {
++            nvc_add(&nvc_totals.allocation_successes, 1);
++            row.memory = out ? (uintptr_t)*out : 0;
++            size_t slot = NVMTL_CENSUS_CAPACITY;
++            int duplicate = 0;
++            for (size_t i = 0; i < NVMTL_CENSUS_CAPACITY; ++i) {
++                if (nvc_rows[i].state == NVC_LIVE && nvc_rows[i].device == row.device && nvc_rows[i].memory == row.memory)
++                    duplicate = 1;
++                if (slot == NVMTL_CENSUS_CAPACITY && (nvc_rows[i].state == NVC_EMPTY || nvc_rows[i].state == NVC_RETIRED))
++                    slot = i;
++            }
++            if (!row.memory) nvc_flag(NVC_BAD_RESULT);
++            if (duplicate) { nvc_flag(NVC_DUPLICATE); nvc_add(&nvc_totals.duplicate_operations, 1); }
++            if (slot == NVMTL_CENSUS_CAPACITY) nvc_flag(NVC_CAPACITY);
++            if (nvc_generation == UINT64_MAX) nvc_flag(NVC_OVERFLOW);
++            if (!row.memory || duplicate || slot == NVMTL_CENSUS_CAPACITY || nvc_generation == UINT64_MAX) {
++                nvc_add(&nvc_totals.untracked_successes, 1);
++            } else {
++                row.generation = ++nvc_generation; row.allocation_sequence = nvc_totals.sequence;
++                row.state = NVC_LIVE; nvc_rows[slot] = row;
++                nvmtl_census_bucket *bucket = nvc_bucket(&row);
++                nvc_add(&bucket->allocated_bytes, row.size);
++                nvc_add(&bucket->live_bytes, row.size); nvc_add(&bucket->live_count, 1);
++                if (bucket->live_bytes > bucket->peak_live_bytes) bucket->peak_live_bytes = bucket->live_bytes;
++            }
++        }
++    }
++    pthread_mutex_unlock(&nvc_lock);
++    return result;
++}
++
++static void nvmtl_census_free(VkDevice device, VkDeviceMemory memory,
++                              const VkAllocationCallbacks *allocator, const char *function, uint32_t line)
++{
++    pthread_mutex_lock(&nvc_lock);
++    nvc_add(&nvc_inflight, 1);
++    int enabled = nvc_totals.enabled;
++    size_t slot = NVMTL_CENSUS_CAPACITY;
++    uint64_t generation = 0;
++    if (enabled) {
++        nvc_add(&nvc_totals.free_calls, 1); nvc_add(&nvc_totals.sequence, 1);
++        if (!memory) nvc_add(&nvc_totals.null_frees, 1);
++        else {
++            int seen = 0;
++            for (size_t i = 0; i < NVMTL_CENSUS_CAPACITY; ++i) {
++                if (nvc_rows[i].state != NVC_EMPTY && nvc_rows[i].device == (uintptr_t)device && nvc_rows[i].memory == (uintptr_t)memory) {
++                    seen = 1;
++                    if (nvc_rows[i].state == NVC_LIVE) { slot = i; break; }
++                }
++            }
++            if (slot == NVMTL_CENSUS_CAPACITY) {
++                if (seen) { nvc_flag(NVC_DUPLICATE); nvc_add(&nvc_totals.duplicate_operations, 1); }
++                else { nvc_flag(NVC_UNKNOWN_FREE); nvc_add(&nvc_totals.unknown_frees, 1); }
++            } else {
++                nvmtl_census_row *row = &nvc_rows[slot];
++                generation = row->generation; row->state = NVC_FREE_PENDING;
++                row->free_function = function; row->free_line = line;
++                nvmtl_census_bucket *bucket = nvc_bucket(row);
++                nvc_add(&bucket->pending_bytes, row->size); nvc_add(&bucket->pending_count, 1);
++            }
++        }
++    }
++    pthread_mutex_unlock(&nvc_lock);
++    pvkFreeMemory(device, memory, allocator);
++    pthread_mutex_lock(&nvc_lock);
++    nvc_sub(&nvc_inflight, 1);
++    if (enabled) {
++        nvc_add(&nvc_totals.sequence, 1);
++        if (slot != NVMTL_CENSUS_CAPACITY) {
++            nvmtl_census_row *row = &nvc_rows[slot];
++            if (row->generation != generation || row->state != NVC_FREE_PENDING ||
++                row->device != (uintptr_t)device || row->memory != (uintptr_t)memory) nvc_flag(NVC_METADATA);
++            else {
++                nvmtl_census_bucket *bucket = nvc_bucket(row);
++                nvc_sub(&bucket->pending_bytes, row->size); nvc_sub(&bucket->pending_count, 1);
++                nvc_sub(&bucket->live_bytes, row->size); nvc_sub(&bucket->live_count, 1);
++                nvc_add(&bucket->freed_api_bytes, row->size);
++                row->state = NVC_RETIRED;
++            }
++        }
++    }
++    pthread_mutex_unlock(&nvc_lock);
++}
+diff --git a/plugin/nvmtl_headless.h b/plugin/nvmtl_headless.h
+new file mode 100755
+--- /dev/null
++++ b/plugin/nvmtl_headless.h
+@@ -0,0 +1,19 @@
++#ifndef NVMTL_HEADLESS_H
++#define NVMTL_HEADLESS_H
++#include <stdbool.h>
++#include <CoreFoundation/CoreFoundation.h>
++#include <IOKit/IOKitLib.h>
++#include <string.h>
++static inline bool nvmtl_accelerator_is_headless(io_registry_entry_t entry) {
++    if (!entry) return false;
++    CFTypeRef value = IORegistryEntryCreateCFProperty(entry, CFSTR("NVAccelHeadless"),
++                                                    kCFAllocatorDefault, 0);
++    // Only the kernel's typed boolean enables this mode, never a string/number.
++    const bool headless = value == kCFBooleanTrue;
++    if (value) CFRelease(value);
++    return headless;
++}
++static inline bool nvmtl_headless_allows_process(bool headless, const char *process) {
++    return !headless || (process && process[0] && strcmp(process, "WindowServer") != 0);
++}
++#endif
+diff --git a/plugin/nvmtl_registration_observation.h b/plugin/nvmtl_registration_observation.h
+new file mode 100644
+--- /dev/null
++++ b/plugin/nvmtl_registration_observation.h
+@@ -0,0 +1,179 @@
++#ifndef NVMTL_REGISTRATION_OBSERVATION_H
++#define NVMTL_REGISTRATION_OBSERVATION_H
++#include <dlfcn.h>
++#include <errno.h>
++#include <execinfo.h>
++#include <inttypes.h>
++#include <mach-o/loader.h>
++#include <pthread.h>
++#include <stdatomic.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <string.h>
++#include <time.h>
++#include <unistd.h>
++
++/* Temporary diagnostic only. 24 * 256 + one 2048-byte stack <= 8192 bytes.
++ * No loader/VT query is made except one dladdr of the existing registrar to
++ * read its already-loaded LC_UUID. No new registration, waiting or retries. */
++static _Atomic int g_nvmtl_regobs_pid;
++static _Atomic unsigned g_nvmtl_regobs_events;
++static _Atomic int g_nvmtl_regobs_stack;
++static _Atomic uintptr_t g_nvmtl_regobs_symbol;
++static _Thread_local int g_nvmtl_regobs_busy;
++static _Atomic unsigned g_nvmtl_regobs_scopes;
++static _Atomic unsigned g_nvmtl_regobs_calls;
++static _Thread_local unsigned g_nvmtl_regobs_scope;
++static _Thread_local unsigned g_nvmtl_regobs_scope_call;
++static _Thread_local unsigned g_nvmtl_regobs_event_call;
++static _Thread_local int g_nvmtl_regobs_rc_valid;
++static _Thread_local int g_nvmtl_regobs_rc;
++
++static int nvmtl_regobs_enabled(void)
++{
++    int owner = atomic_load_explicit(&g_nvmtl_regobs_pid, memory_order_relaxed);
++    return owner && owner == getpid();
++}
++static unsigned nvmtl_regobs_reserve(void)
++{
++    unsigned n = atomic_load_explicit(&g_nvmtl_regobs_events, memory_order_relaxed);
++    for (unsigned tries = 0; tries < 8 && n < 24; tries++)
++        if (atomic_compare_exchange_weak_explicit(&g_nvmtl_regobs_events, &n, n + 1,
++                memory_order_relaxed, memory_order_relaxed)) return n + 1;
++    return 0; /* Drop on contention or exhaustion; never wait. */
++}
++static void nvmtl_regobs_event(const char *event, int state, int status)
++{
++    int saved_errno = errno;
++    if (nvmtl_regobs_enabled() && !g_nvmtl_regobs_busy) {
++        g_nvmtl_regobs_busy = 1;
++        unsigned seq = nvmtl_regobs_reserve();
++        if (seq) {
++            char line[256]; uint64_t tid = 0;
++            (void)pthread_threadid_np(NULL, &tid);
++            int n = snprintf(line, sizeof line,
++                "nvmtl-regobs v1 pid=%d tid=%" PRIu64 " ns=%" PRIu64 " seq=%u event=%s state=%d status=%d origin=%s scope=%u reg_call=%u vt_symbol=0x%" PRIxPTR "\n",
++                getpid(), tid, clock_gettime_nsec_np(CLOCK_MONOTONIC), seq,
++                event, state, status, g_nvmtl_regobs_scope ? "post_config" : "device_path",
++                g_nvmtl_regobs_scope, g_nvmtl_regobs_event_call, atomic_load_explicit(&g_nvmtl_regobs_symbol, memory_order_relaxed));
++            if (n > 0) (void)write(STDERR_FILENO, line,
++                (size_t)n < sizeof line ? (size_t)n : sizeof line - 1);
++        }
++        g_nvmtl_regobs_busy = 0;
++    }
++    errno = saved_errno;
++}
++static void nvmtl_regobs_begin(const char *canonical)
++{
++    int saved_errno = errno;
++    if (canonical && !strcmp(canonical, "/Applications/VideoProc Converter AI.app/Contents/Frameworks/ffmpeg")) {
++        int expected = 0;
++        if (atomic_compare_exchange_strong_explicit(&g_nvmtl_regobs_pid, &expected, getpid(),
++                memory_order_relaxed, memory_order_relaxed) || expected == getpid()) {
++            g_nvmtl_regobs_scope = atomic_fetch_add_explicit(&g_nvmtl_regobs_scopes, 1, memory_order_relaxed) + 1;
++            g_nvmtl_regobs_scope_call = 0;
++            g_nvmtl_regobs_rc_valid = 0;
++            g_nvmtl_regobs_rc = 0;
++            nvmtl_regobs_event("config_complete", 0, 0);
++            nvmtl_regobs_event("path_gate", 1, 0);
++        }
++    }
++    errno = saved_errno;
++}
++static void nvmtl_regobs_symbol(const void *symbol)
++{
++    int saved_errno = errno;
++    if (nvmtl_regobs_enabled()) {
++        atomic_store_explicit(&g_nvmtl_regobs_symbol, (uintptr_t)symbol, memory_order_relaxed);
++        nvmtl_regobs_event("vt_symbol", symbol != NULL, 0);
++    }
++    errno = saved_errno;
++}
++/* IDs describe actual calls, never entry/CAS/missing-symbol shortcuts. */
++static unsigned nvmtl_regobs_call(void)
++{
++    int saved_errno = errno;
++    unsigned call = 0;
++    if (nvmtl_regobs_enabled()) {
++        call = atomic_fetch_add_explicit(&g_nvmtl_regobs_calls, 1, memory_order_relaxed) + 1;
++        if (g_nvmtl_regobs_scope) {
++            g_nvmtl_regobs_scope_call = call;
++            g_nvmtl_regobs_rc_valid = 0;
++        }
++    }
++    errno = saved_errno;
++    return call;
++}
++static void nvmtl_regobs_result(unsigned call, int status)
++{
++    int saved_errno = errno;
++    if (nvmtl_regobs_enabled() && call) {
++        if (g_nvmtl_regobs_scope && g_nvmtl_regobs_scope_call == call) {
++            g_nvmtl_regobs_rc = status;
++            g_nvmtl_regobs_rc_valid = 1;
++        }
++        g_nvmtl_regobs_event_call = call;
++        nvmtl_regobs_event("register_result", status ? 0 : 2, status);
++        g_nvmtl_regobs_event_call = 0;
++    }
++    errno = saved_errno;
++}
++static void nvmtl_regobs_uuid(const void *symbol, char uuid[33])
++{
++    memcpy(uuid, "unknown", 8);
++    Dl_info image;
++    if (!symbol || !dladdr(symbol, &image) || !image.dli_fbase) return;
++    const struct mach_header_64 *header = image.dli_fbase;
++    if (header->magic != MH_MAGIC_64 || header->ncmds > 128 || header->sizeofcmds > 65536) return;
++    const unsigned char *cursor = (const unsigned char *)(header + 1);
++    size_t remaining = header->sizeofcmds;
++    for (uint32_t i = 0; i < header->ncmds; i++) {
++        if (remaining < sizeof(struct load_command)) return;
++        const struct load_command *command = (const void *)cursor;
++        if (command->cmdsize < sizeof *command || command->cmdsize > remaining) return;
++        if (command->cmd == LC_UUID) {
++            if (command->cmdsize < sizeof(struct uuid_command)) return;
++            const struct uuid_command *value = (const void *)command;
++            for (unsigned j = 0; j < 16; j++) snprintf(uuid + 2*j, 3, "%02x", value->uuid[j]);
++            return;
++        }
++        cursor += command->cmdsize; remaining -= command->cmdsize;
++    }
++}
++static void nvmtl_regobs_finish(void)
++{
++    int saved_errno = errno;
++    int end_scope = nvmtl_regobs_enabled() && !g_nvmtl_regobs_busy;
++    if (end_scope && !atomic_exchange_explicit(&g_nvmtl_regobs_stack, 1, memory_order_relaxed)) {
++        g_nvmtl_regobs_busy = 1;
++        char line[2048], uuid[33]; void *pcs[64]; uint64_t tid = 0;
++        uintptr_t symbol = atomic_load_explicit(&g_nvmtl_regobs_symbol, memory_order_relaxed);
++        nvmtl_regobs_uuid((const void *)symbol, uuid);
++        int frames = backtrace(pcs, 64);
++        if (frames < 0) frames = 0;
++        if (frames > 64) frames = 64;
++        (void)pthread_threadid_np(NULL, &tid);
++        int n = snprintf(line, sizeof line,
++            "nvmtl-regobs v1 pid=%d tid=%" PRIu64 " ns=%" PRIu64 " event=stack origin=post_config scope=%u reg_call=%u rc_valid=%d rc=%d vt_symbol=0x%" PRIxPTR " vt_uuid=%s frames=%d pc=",
++            getpid(), tid, clock_gettime_nsec_np(CLOCK_MONOTONIC),
++            g_nvmtl_regobs_scope, g_nvmtl_regobs_scope_call, g_nvmtl_regobs_rc_valid,
++            g_nvmtl_regobs_rc, symbol, uuid, frames);
++        size_t used = n > 0 && (size_t)n < sizeof line ? (size_t)n : 0;
++        for (int i = 0; used && i < frames && used + 20 < sizeof line; i++) {
++            n = snprintf(line + used, sizeof line - used, "%s0x%" PRIxPTR, i ? "," : "", (uintptr_t)pcs[i]);
++            if (n <= 0 || (size_t)n >= sizeof line - used) { used = 0; break; }
++            used += (size_t)n;
++        }
++        if (used && used + 1 < sizeof line) { line[used++] = '\n'; (void)write(STDERR_FILENO, line, used); }
++        g_nvmtl_regobs_busy = 0;
++    }
++    /* A reentrant dropped finish must not clear its outer scope. */
++    if (end_scope) {
++        g_nvmtl_regobs_scope = 0;
++        g_nvmtl_regobs_scope_call = 0;
++        g_nvmtl_regobs_rc_valid = 0;
++        g_nvmtl_regobs_rc = 0;
++    }
++    errno = saved_errno;
++}
++#endif
+diff --git a/plugin/nvmtl_vk.c b/plugin/nvmtl_vk.c
+--- a/plugin/nvmtl_vk.c
++++ b/plugin/nvmtl_vk.c
+@@ -193,6 +193,11 @@
+ #undef DECL
+ #define LOAD_I(f) do { p##f = (PFN_##f)pvkGetInstanceProcAddr(g_inst, #f); if (!p##f) { nvlog("vk: missing %s", #f); return -1; } } while (0);
+ #define LOAD_D(f) do { p##f = (PFN_##f)pvkGetDeviceProcAddr(g_dev, #f);   if (!p##f) { nvlog("vk: missing %s", #f); return -1; } } while (0);
++
++/* Opt-in, API-request census; no claim of physical memory residency. */
++#include "nvmtl_allocation_census.inc"
++#define pvkAllocateMemory(d,i,a,o) nvmtl_census_allocate((d),(i),(a),(o),__func__,__LINE__)
++#define pvkFreeMemory(d,m,a) nvmtl_census_free((d),(m),(a),__func__,__LINE__)
+ 
+ _Static_assert(sizeof(VkBuffer) == sizeof(void *) && _Alignof(VkBuffer) == _Alignof(void *), "VkBuffer bridge ABI");
+ static VkResult nvmtl_opaque_CreateBuffer(VkDevice dev, const VkBufferCreateInfo *info, const VkAllocationCallbacks *allocator, void **out)
+@@ -1478,17 +1483,14 @@
+ {
+     uint64_t bud = 0, used = 0;
+     int measured = nvmtl_vk_vram_budget(&bud, &used);
+-    uint64_t card = nvmtl_vk_vram_bytes();
+-    uint64_t inv = bud / 9 * 10;
+-    uint64_t freev = card;
++    /* heapBudget includes heapUsage; retain the driver's safety margin. */
++    uint64_t freev = bud > used ? bud - used : 0;
++    const uint64_t delta = g_budget_delta;
++    int gate = used > bud || delta > freev;
++    freev = freev > delta ? freev - delta : 0;
+     uint64_t head = NVMTL_VRAM_HEADROOM;
+-    int gate;
+-    if (!measured || !bud) gate = (used + g_budget_delta + want + head > bud);
+-    else if (inv >= card) gate = 0;
+-    else { freev = inv > used ? inv - used : 0;
+-
+-           freev = freev > g_budget_delta ? freev - g_budget_delta : 0;
+-           gate = (want + head > freev); }
++    /* Check before subtracting so neither request nor headroom can wrap. */
++    gate = gate || want > freev || head > freev - want;
+     if (freev_out) *freev_out = freev;
+     if (bud_out) *bud_out = bud;
+     if (used_out) *used_out = used;
+diff --git a/plugin/nvmtl_vk.h b/plugin/nvmtl_vk.h
+--- a/plugin/nvmtl_vk.h
++++ b/plugin/nvmtl_vk.h
+@@ -5,6 +5,7 @@
+  */
+ 
+ #pragma once
++#include "nvmtl_allocation_census.h"
+ #include <stdint.h>
+ #include <stddef.h>
+ const char *nvmtl_image_ident(const void *addr, char *out, size_t n);

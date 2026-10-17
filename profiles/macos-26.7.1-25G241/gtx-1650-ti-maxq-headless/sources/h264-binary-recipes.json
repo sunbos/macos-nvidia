@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "distribution_scope": "patch_recipes_only_no_codec_binaries",
+  "audit": {
+    "source_evidence_read_only": true,
+    "source_files_modified": false,
+    "build_executed": false,
+    "gpu_executed": false,
+    "installation_performed": false,
+    "signing_executed": false
+  },
+  "h264_encode": {
+    "target_basename": "libnvenc_h264.dylib",
+    "baseline_bytes": 80656,
+    "baseline_sha256": "164f6dfa409352e90b079659578a012dc37d1fba364067b99cb8c7bf337b1b5d",
+    "patched_pre_sign_sha256": "850989080f9d1eec915b712a1cf92e5a20835b7e00c08570b4cb6655e9ba34ce",
+    "signed_sha256": "3973ae24d136599cfea27b0c1f33c4654b4eed36c3ac842b89b00c76078e88b7",
+    "patches": [
+      {
+        "offset": "0x626a",
+        "end_exclusive": "0x62c9",
+        "length_bytes": 95,
+        "old_hex": "4489e0c1e8044489e183e108c1e1064489e283e2078d0cd131d231f6662e0f1f840000000000418b7f10c1ef060faff84189f041c1e8064101f841c1e00a89d781e7c001000009cf4409c74d8b04364c89043b4883c60883c2404c39ce7cc7",
+        "new_hex": "4489e0c1e804418b7f10c1ef060fafc7c1e00a4489e183e1034489e283e2048d0c51c1e1044489e283e208c1e20609d109c131d231f689f783e7c0c1e70401cf09d74d8b04364c89043b4883c60881ea4801000081e2480100004c39ce7cd7",
+        "new_sha256": "f88fe4e0330c15a8e0b4c48a6380e94277ef196505b03e662c948140f1a85f80"
+      },
+      {
+        "offset": "0x6399",
+        "end_exclusive": "0x63fb",
+        "length_bytes": 98,
+        "old_hex": "4489e0c1e8044489e283e208c1e2064489e1c1e10483e17009d131d231f6660f1f840000000000418b7910c1ef060faff84189f041c1e8064101f841c1e00a89d781e78001000009cf4409c7410f100436410f11043a4883c61083ea804839de7cc5",
+        "new_hex": "4489e0c1e804418b7910c1ef060fafc7c1e00a4489e183e1034489e283e2048d0c51c1e1044489e283e208c1e20609d109c131d231f69089f783e7c0c1e70401cf09d7410f100436410f11043a4883c61081ea4001000081e2400100004839de7cd5",
+        "new_sha256": "f0d94007246a117670e66504702b21734bc5bab2ef3a405a8bd0100720f23920"
+      }
+    ],
+    "changed_code_byte_count": 169,
+    "signing": {
+      "argv": [
+        "/usr/bin/codesign",
+        "--force",
+        "--sign",
+        "-",
+        "--preserve-metadata=identifier,requirements,flags",
+        "<output>"
+      ],
+      "verify_argv": [
+        "/usr/bin/codesign",
+        "--verify",
+        "--strict",
+        "<output>"
+      ],
+      "historical_sign_exit_code": 0,
+      "historical_strict_verify_exit_code": 0,
+      "signature_file_offset": 61872,
+      "signature_size_bytes_before_and_after": 18784,
+      "permitted_signing_field_ranges_exclusive": [
+        [
+          1980,
+          1984
+        ],
+        [
+          1080,
+          1088
+        ],
+        [
+          1096,
+          1104
+        ]
+      ],
+      "observed_changes_before_signature_due_to_signing": []
+    },
+    "source_artifacts": {
+      "candidate_assembly_sha256": "9ecc2b715ae096a384341281f932f39a4a0dd1a1f1f355e86144e657cfd9c7e2",
+      "prepare_script_sha256": "71234388b98d3456360ea55368e734696f6cb7ecd10e6c192c629edfa3aecef7",
+      "historical_receipt_sha256": "01ecbf1351788d6a9815bd29704e99564328314fcf6f2202c3d8684802393fc1"
+    },
+    "verified_this_audit": [
+      "现存 pre-sign 和 signed 候选完整 SHA 与收据一致",
+      "两段新 bytes 与现存候选一致",
+      "按 old_hex 在内存逆补丁可恢复完整 baseline SHA",
+      "签名前段在 pre-sign 和 signed 候选之间完全一致",
+      "unsigned 相对恢复的 baseline 恰有 169 个不同字节"
+    ]
+  },
+  "h264_decode": {
+    "input_basename": "libnvdec_h264.dylib",
+    "output_basename": "libnvdec_h264_t2d.dylib",
+    "baseline_bytes": 80080,
+    "baseline_sha256": "ebf782888d4663955f6d7ce04dc158b7b5cfb78f48651450305b3e56abf88d15",
+    "patched_pre_sign_sha256": "8bc7f36a42972a803f4cf40417c909ec0b6f75d8b8d7d66bdb61f1013a80230a",
+    "signed_sha256": "d1127f8139621753e5b543f4afd8ac86e6ebb1b80d3c3b32975953e68cc9adfa",
+    "instruction_guard": {
+      "offset": "0x163d",
+      "old_hex": "ba01000000",
+      "new_hex": "ba00000000"
+    },
+    "patches": [
+      {
+        "offset": "0x163e",
+        "end_exclusive": "0x163f",
+        "length_bytes": 1,
+        "old_hex": "01",
+        "new_hex": "00"
+      }
+    ],
+    "changed_code_byte_count": 1,
+    "signing": {
+      "argv": [
+        "/usr/bin/codesign",
+        "--force",
+        "--sign",
+        "-",
+        "--identifier",
+        "libnvdec_h264-5555494427c71bdb57dd3a2c96374649aebf2203",
+        "--timestamp=none",
+        "<output>"
+      ],
+      "verify_argv": [
+        "/usr/bin/codesign",
+        "--verify",
+        "--strict",
+        "<output>"
+      ],
+      "historical_sign_exit_code": 0,
+      "historical_strict_verify_exit_code": 0,
+      "signature_file_offset": 61328,
+      "signature_size_bytes_before_and_after": 18752,
+      "observed_total_changed_byte_count": 33,
+      "observed_changed_offsets_outside_signature": [
+        5694
+      ]
+    },
+    "upstream_patch_tool": {
+      "repository": "https://github.com/nullmoth/nvidia-macos-driver",
+      "commit": "cd8e2bb04da48d2fa70cf1895879608f3588dbfb",
+      "path": "tools/make_nvdec_t2d.py",
+      "url": "https://github.com/nullmoth/nvidia-macos-driver/blob/cd8e2bb04da48d2fa70cf1895879608f3588dbfb/tools/make_nvdec_t2d.py",
+      "git_blob_sha1": "9d38f36e99324ce68b815b14a03964384b056606",
+      "sha256": "7cde6fec4509fbd67659efdde95f40ec923217e83d0156d8af0cfaf81899c990",
+      "original_input_guard": "SHA-256 prefix ebf78288 plus five instruction bytes",
+      "recommended_archive_input_guard": "exact full baseline SHA-256 plus old instruction bytes"
+    },
+    "historical_receipt_sha256": "bb905335ebd6b3b3655755a106a5579df475f0a4deb034e2453b97c21f42d9a9",
+    "verified_this_audit": [
+      "两个历史归档原库的完整 baseline SHA 一致",
+      "在内存应用单字节补丁所得 pre-sign SHA 与收据一致",
+      "现存 signed 候选的完整 SHA 与收据一致",
+      "signed 候选在签名区以外仅改变 0x163e",
+      "signed 候选相对 baseline 共改变 33 bytes"
+    ]
+  },
+  "source_and_license_provenance": {
+    "source_archive_commit": "cd8e2bb04da48d2fa70cf1895879608f3588dbfb",
+    "source_archive_sha256": "ff817885354b2f47f3f16c3cdfbd7288628092bf7dd52825c98ba5c72f8d5bf9",
+    "source_archive_url": "https://codeload.github.com/nullmoth/nvidia-macos-driver/tar.gz/cd8e2bb04da48d2fa70cf1895879608f3588dbfb",
+    "root_license_name": "PolyForm Noncommercial License 1.0.0",
+    "root_license_url": "https://github.com/nullmoth/nvidia-macos-driver/blob/cd8e2bb04da48d2fa70cf1895879608f3588dbfb/LICENSE",
+    "root_license_sha256": "1b5c7a92697863d38fd2779af76732acfb8f521b758781eab057ad966701b0b7",
+    "root_license_git_blob_sha1": "f2575a258d86240add7334ca0d5c6fc961ea9a60",
+    "required_notice": "Required Notice: Copyright (c) 2026 NullMoth Systems (https://nullmothsystems.com)",
+    "notice_sha256": "d3eb6510e54feef70d510af1ab74e8c3c57b796e5656da6b73e44bd89a07aa48",
+    "full_codec_source_build_entry_found_in_pinned_archive": false
+  },
+  "evidence_scope": {
+    "historical_receipts_are_not_current_runtime_or_installation_status": true,
+    "this_audit_establishes": "固定输入上的字节补丁配方、现存产物完整 SHA 与历史签名收据的一致性；本次未重新运行 CPU/GPU 测试或签名验证。"
+  },
+  "gaps": [
+    {
+      "id": "complete_codec_source_build_provenance",
+      "description": "固定上游归档只有 decoder 二进制派生脚本和 plugin codec 加载入口，未发现完整 codec 构建入口。缺少四个 codec dylib 的完整 translation units、headers、依赖提交、编译器/SDK 与完整编译链接命令。candidate.s 仅是两段编码补丁的 assembly。",
+      "impact": "这些配方是固定 baseline 的二进制派生，不能声称从完整 codec 源码重建。"
+    },
+    {
+      "id": "cross_environment_signature_determinism",
+      "description": "signed SHA 是现存历史产物的核验值。本次未重新签名，也未验证不同 macOS 或 codesign 版本能生成相同签名 bytes；pre-sign SHA 已通过内存字节变换独立验证。",
+      "impact": "不得承诺跨环境重新签名必然得到相同 signed SHA。"
+    },
+    {
+      "id": "codec_binary_license_provenance",
+      "description": "已确认固定上游归档根 LICENSE、NOTICE 与 Required Notice；未发现 codec 二进制单独的来源及许可说明。根许可证证据不足以证明所有 codec 二进制的再分发许可。",
+      "impact": "本归档仅发布补丁配方，不发布 codec 二进制；复制的上游脚本保留来源、原许可证和 notice，不改标为 MIT。"
+    }
+  ]
+}

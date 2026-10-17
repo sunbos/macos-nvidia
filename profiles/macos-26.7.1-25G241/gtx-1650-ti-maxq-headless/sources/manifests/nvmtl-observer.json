@@ -1,0 +1,171 @@
+{
+  "schema_version": 1,
+  "id": "nvmtl-observer",
+  "base": {
+    "repository": "https://github.com/nullmoth/nvidia-macos-driver",
+    "commit": "592b8df746371b523d5db0315f9794a57bff5c8e"
+  },
+  "patch": "patches/nvmtl-observer.patch",
+  "patch_sha256": "0681cf7923185f6bfd7ca1ddddd8aba681043043d3eaf1e2763bb95685dc4a01",
+  "selected_source_files": 26,
+  "changed_files": 9,
+  "files": [
+    {
+      "path": "plugin/NVMTLDevice.m",
+      "base_sha256": "3ca85a3cf227cd44df60d128462ee2ff53eadea359292b35c7c90bd670d968df",
+      "source_sha256": "d6185da2a5124ad11a63ca4b24caa35eec3dae26497aefe3e42def63f7560fbe",
+      "bytes": 122127
+    },
+    {
+      "path": "plugin/NVMTLDevice_contract.m",
+      "base_sha256": "f11bb0f5dfd8960b2bc701c98d0bc730252f66933bcb3d198a8b2741e9244c40",
+      "source_sha256": "f11bb0f5dfd8960b2bc701c98d0bc730252f66933bcb3d198a8b2741e9244c40",
+      "bytes": 5097
+    },
+    {
+      "path": "plugin/NVMTLEmbedded.m",
+      "base_sha256": "510080ad5e7cd2282b0680b9941e1f0f64149fb2cc3c8a402e3d62640d25340d",
+      "source_sha256": "510080ad5e7cd2282b0680b9941e1f0f64149fb2cc3c8a402e3d62640d25340d",
+      "bytes": 17672
+    },
+    {
+      "path": "plugin/NVMTLEventSync.m",
+      "base_sha256": "cfb21b90b7a10651b73d2e7c5751cead2bf9b60bcf63b15fd788bb067faa3e81",
+      "source_sha256": "cfb21b90b7a10651b73d2e7c5751cead2bf9b60bcf63b15fd788bb067faa3e81",
+      "bytes": 24784
+    },
+    {
+      "path": "plugin/NVMTLForward.m",
+      "base_sha256": "a196e3bd3c0dd0340609a2164dfbca1851786d6bfacdc7885f505808920fb3bd",
+      "source_sha256": "a196e3bd3c0dd0340609a2164dfbca1851786d6bfacdc7885f505808920fb3bd",
+      "bytes": 11137
+    },
+    {
+      "path": "plugin/NVMTLGL.m",
+      "base_sha256": "67ec52b4a7b620b6223289343ffba2993980bc032139fe1ac572524bea3dd0ad",
+      "source_sha256": "67ec52b4a7b620b6223289343ffba2993980bc032139fe1ac572524bea3dd0ad",
+      "bytes": 25688
+    },
+    {
+      "path": "plugin/NVMTLLibraryLoad.m",
+      "base_sha256": "5f0844490a432adf36003770a28073bfe49938e82c9da456f13e20b6d935422e",
+      "source_sha256": "0adfd3a103888d3a034c05a05beec3c0dd352d5e3546372580a4866c9967a99b",
+      "bytes": 165979
+    },
+    {
+      "path": "plugin/NVMTLObjects.h",
+      "base_sha256": "283a35d5f7ee621224ee954fba5a6ac2cbd9eb0240f622eb23377828ad160c96",
+      "source_sha256": "283a35d5f7ee621224ee954fba5a6ac2cbd9eb0240f622eb23377828ad160c96",
+      "bytes": 17689
+    },
+    {
+      "path": "plugin/NVMTLObjects.m",
+      "base_sha256": "bfd3d65c856bd4398a9002e43a0e67f988e336b98ec1d377193678acbf42708a",
+      "source_sha256": "c28b7be1ef1a64fb535286f70dce44ca5c74d8cfd8d9bd097db4e3924a687b73",
+      "bytes": 358644
+    },
+    {
+      "path": "plugin/NVMTLVendorCompiler.m",
+      "base_sha256": "33f8d290b8b3fdca3e881905774edf63a3331ec73d35e0bd8c0cb3c0123c309f",
+      "source_sha256": "33f8d290b8b3fdca3e881905774edf63a3331ec73d35e0bd8c0cb3c0123c309f",
+      "bytes": 24377
+    },
+    {
+      "path": "plugin/nvconv_lib.h",
+      "base_sha256": "ad00db5fab28566cf276c2a17894156ed296cc5b6ef51512b67b05174e5034d3",
+      "source_sha256": "ad00db5fab28566cf276c2a17894156ed296cc5b6ef51512b67b05174e5034d3",
+      "bytes": 341375
+    },
+    {
+      "path": "plugin/nvmtl_allocation_census.h",
+      "base_sha256": null,
+      "source_sha256": "a2a7b9895317c4b520a3ca902213fe73f603b76f05c00fe5a285e664ee2e5fa9",
+      "bytes": 1900
+    },
+    {
+      "path": "plugin/nvmtl_allocation_census.inc",
+      "base_sha256": null,
+      "source_sha256": "d4bd2cd491c89e4809c62cebfa5b9467a84febee44cef20e3e3bf993df6589ae",
+      "bytes": 9697
+    },
+    {
+      "path": "plugin/nvmtl_headless.h",
+      "base_sha256": null,
+      "source_sha256": "93c073222790e1ec89fdec94e5f180586ae5b484a73636982bdcb48448465caa",
+      "bytes": 807
+    },
+    {
+      "path": "plugin/nvmtl_independent_helpers.h",
+      "base_sha256": "389c1770e4058f149a9c5a786fbddd513e39216a9908dd2b1e1118a10ac43f2a",
+      "source_sha256": "389c1770e4058f149a9c5a786fbddd513e39216a9908dd2b1e1118a10ac43f2a",
+      "bytes": 4871
+    },
+    {
+      "path": "plugin/nvmtl_log_failure.h",
+      "base_sha256": "58959f7daba3196349ba9e668c6cd8685d79f2d7c110029d9a0ac752414a91fd",
+      "source_sha256": "58959f7daba3196349ba9e668c6cd8685d79f2d7c110029d9a0ac752414a91fd",
+      "bytes": 961
+    },
+    {
+      "path": "plugin/nvmtl_physical_bounds.h",
+      "base_sha256": "bf3afe460229160d82b6948531d65c6f0f8f53662969f7414646f3c4ab552b5a",
+      "source_sha256": "bf3afe460229160d82b6948531d65c6f0f8f53662969f7414646f3c4ab552b5a",
+      "bytes": 1193
+    },
+    {
+      "path": "plugin/nvmtl_readonly_metadata.h",
+      "base_sha256": "b3b2eb8d0bc675ae67d41ad2403808e4392ad7530809c695b86624ee00265718",
+      "source_sha256": "b3b2eb8d0bc675ae67d41ad2403808e4392ad7530809c695b86624ee00265718",
+      "bytes": 4046
+    },
+    {
+      "path": "plugin/nvmtl_registration_observation.h",
+      "base_sha256": null,
+      "source_sha256": "081ca9dcf0c1ee08dffba951ac18e7402b4a53d5f90658820532c5fac21e0368",
+      "bytes": 7853
+    },
+    {
+      "path": "plugin/nvmtl_sample_depth_contract.h",
+      "base_sha256": "faf44f6839bfa95c0919c82b31acb451d05bf5583f1f84da69f0fab354576e49",
+      "source_sha256": "faf44f6839bfa95c0919c82b31acb451d05bf5583f1f84da69f0fab354576e49",
+      "bytes": 503
+    },
+    {
+      "path": "plugin/nvmtl_sample_positions.h",
+      "base_sha256": "ac3d8d6d7e0de5c569b2561fc63244f325df8f12ceb437f14e47cb4b5939c4e1",
+      "source_sha256": "ac3d8d6d7e0de5c569b2561fc63244f325df8f12ceb437f14e47cb4b5939c4e1",
+      "bytes": 2724
+    },
+    {
+      "path": "plugin/nvmtl_sampler_desc.h",
+      "base_sha256": "4cac887dab4f5e1bbf1b8792ed4a3a26a7042f13fb509f82150308a5a249f00c",
+      "source_sha256": "4cac887dab4f5e1bbf1b8792ed4a3a26a7042f13fb509f82150308a5a249f00c",
+      "bytes": 449
+    },
+    {
+      "path": "plugin/nvmtl_sampler_state.h",
+      "base_sha256": "4ba461bb5c9e6765295088830a656bcda8448d976a16bda0600abd4a59b65380",
+      "source_sha256": "4ba461bb5c9e6765295088830a656bcda8448d976a16bda0600abd4a59b65380",
+      "bytes": 3052
+    },
+    {
+      "path": "plugin/nvmtl_visibility_sum_spv.h",
+      "base_sha256": "978a002c34c91235dac75b7673ac2c49f1114de994f28e9d440332a16618e627",
+      "source_sha256": "978a002c34c91235dac75b7673ac2c49f1114de994f28e9d440332a16618e627",
+      "bytes": 3575
+    },
+    {
+      "path": "plugin/nvmtl_vk.c",
+      "base_sha256": "01b2072611802ea51ce7188ac6dae0ffd247dec4954fe70048b837d70b5a2b33",
+      "source_sha256": "7679e8f7e11c426f066575859116929a0e38d79114a665bd26cc74e3f44a525d",
+      "bytes": 445464
+    },
+    {
+      "path": "plugin/nvmtl_vk.h",
+      "base_sha256": "a5ae04747966a0a6e26be044c8e5a8180fbb252e7ac45d6abdec7d9b8120d4d0",
+      "source_sha256": "d7bcbb31e8612944d4cb640c37f888c13c4e0ca94e2b2a432afb45abb91f29ca",
+      "bytes": 25916
+    }
+  ],
+  "verification_scope": "Selected source files only; apply check and exact output hashes, no build or runtime execution."
+}

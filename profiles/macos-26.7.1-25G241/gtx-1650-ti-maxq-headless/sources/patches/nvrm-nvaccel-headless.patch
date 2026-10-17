@@ -1,0 +1,912 @@
+diff --git a/build/accel_build.sh b/build/accel_build.sh
+--- a/build/accel_build.sh
++++ b/build/accel_build.sh
+@@ -3,6 +3,8 @@
+ SRC=$1; OUT=$2; mkdir -p "$OUT/NVAccel.kext/Contents/MacOS"
+ OGKM=${OGKM:-$HOME/ogkm610}; RE=${RE:-$SRC/accel/re}   # the reconstructed IOGraphicsAccelerator2 / IOAccelerator headers ship in the repo
+ SDK=$(xcrun --show-sdk-path); KHDR="$SDK/System/Library/Frameworks/Kernel.framework/Headers"; NV="$OGKM/src/nvidia"; KMS="$OGKM/src/nvidia-modeset"
++RM_COMMANDS=${RM_COMMANDS:-$NV/_out/Darwin_x86_64/compile_cmds.sh}
++[ -s "$RM_COMMANDS" ] || { echo "STOP: RM compiler command file missing: $RM_COMMANDS"; exit 2; }
+ RMINC=( -I"$NV/arch/nvalloc/unix/include" -I"$NV/arch/nvalloc/common/inc" -I"$NV/arch/nvalloc/common/inc/gsp"
+   -I"$OGKM/src/common/sdk/nvidia/inc" -I"$OGKM/src/common/sdk/nvidia/inc/hw" -I"$OGKM/src/common/inc"
+   -I"$OGKM/src/common/shared/inc" -I"$NV/inc" -I"$NV/inc/os" -I"$NV/inc/kernel" -I"$NV/kernel/inc" -I"$NV/interface"
+@@ -12,7 +14,16 @@
+   -I"$OGKM/src/common/inc/displayport" -I"$OGKM/src/common/nvlink/inband/interface" )
+ KMSINC=( -I"$KMS/os-interface/include" -I"$KMS/kapi/interface" -I"$KMS/kapi/include" -I"$OGKM/src/common/unix/nvidia-push/interface" -I"$KMS/interface" -I"$KMS/include"
+          -I"$OGKM/src/common/unix/common/inc" -I"$OGKM/src/common/modeset" -I"$OGKM/src/common/unix/common/utils/interface" )
+-RMDEFS=(); while read -r d; do RMDEFS+=("$d"); done < <(head -1 "$NV/_out/Darwin_x86_64/compile_cmds.sh" | tr ' ' '\n' | grep -E '^-D' | sed -e 's/"//g' | grep -v -E '^-D(NVRM|_LANGUAGE_C)$')
++# Preserve quoted defines in both the vendor command log and the local builder's
++# shell-quoted command (for example MBEDTLS_USER_CONFIG_FILE=<...>).
++RMDEFS_TEXT=$(python3 - "$RM_COMMANDS" <<'PYDEFS'
++import pathlib, shlex, sys
++for value in shlex.split(pathlib.Path(sys.argv[1]).read_text().splitlines()[0]):
++    if value.startswith("-D") and value not in ("-DNVRM", "-D_LANGUAGE_C"):
++        print(value)
++PYDEFS
++) || exit 2
++RMDEFS=(); while IFS= read -r d; do [ -z "$d" ] || RMDEFS+=("$d"); done <<< "$RMDEFS_TEXT"
+ CFLAGS=( -arch x86_64 -fapple-kext -mkernel -nostdinc -I"$KHDR" -I"$SRC" "${RMINC[@]}" "${KMSINC[@]}"
+   -DKERNEL -DKERNEL_PRIVATE -DDRIVER_PRIVATE -DAPPLE -DNeXT "${RMDEFS[@]}" ${NM_TAHOE:+-DNM_TAHOE}   # NM_TAHOE=1: the macOS 26 build
+   -std=c++17 -fno-rtti -fno-exceptions -fno-builtin -fno-common
+diff --git a/build/build_nvrm_local.py b/build/build_nvrm_local.py
+new file mode 100644
+--- /dev/null
++++ b/build/build_nvrm_local.py
+@@ -0,0 +1,237 @@
++#!/usr/bin/env python3
++"""Build NVRM only, into a local directory. Never install or load a kext.
++
++The public repository does not include the build-nvrm.sh referenced by rmcc.py.
++This uses NVIDIA's own object rules, then archives Mach-O objects and links the
++XNU adapter. NV_BSD selects the non-Linux Unix version definitions: NV_LINUX
++would also enable Linux-only NVLink locking that the XNU adapter does not supply.
++This is a reproducible development build, not a byte-identical release rebuild.
++"""
++
++import argparse
++import hashlib
++import json
++import os
++from pathlib import Path
++import re
++import shlex
++import shutil
++import subprocess
++import sys
++
++
++OGKM_COMMIT = "e4a5faa2567f28c8eabe0ebb6422b6d0abcf37eb"  # NVIDIA 610.57.04
++CORE_DIR = "_out/Darwin_x86_64_bsd"
++CORE_FLAGS = "-DNV_UNIX -DNV_BSD -fapple-kext -mkernel"
++CPP_SOURCES = [
++    "NVRM.cpp", "nv_xnu_stubs.cpp", "os-xnu.cpp", "os-xnu2.cpp",
++    "os-nvkms-xnu.cpp", "nvkms_shaders.cpp", "nvrm_fbinfo.cpp",
++    "nvrm_gpuva.cpp", "nvrm_surfshare.cpp",
++]
++
++
++def digest(path):
++    return hashlib.sha256(path.read_bytes()).hexdigest()
++
++
++def capture(argv, cwd=None):
++    return subprocess.check_output(argv, cwd=cwd, text=True, stderr=subprocess.PIPE)
++
++
++def run(argv, log, cwd=None):
++    with log.open("w") as stream:
++        result = subprocess.run(argv, cwd=cwd, stdout=stream, stderr=subprocess.STDOUT)
++    if result.returncode:
++        print(log.read_text()[-8000:], file=sys.stderr)
++        raise RuntimeError(f"command failed ({result.returncode}); log: {log}")
++
++
++def object_command(base, component, source, target, logs):
++    argv = base + ["-B", "-n", "NV_VERBOSE=1", target]
++    result = subprocess.run(argv, cwd=component, text=True, capture_output=True)
++    (logs / (component.name + "-command.log")).write_text(result.stdout + result.stderr)
++    if result.returncode:
++        raise RuntimeError(f"cannot obtain {component.name} compiler command")
++    matches = []
++    for line in result.stdout.splitlines():
++        if " && " in line:
++            line = line.split(" && ", 1)[0]
++        tokens = shlex.split(line)
++        if "-c" in tokens and source in tokens:
++            matches.append(tokens)
++    if len(matches) != 1:
++        raise RuntimeError(f"expected one command for {source}, found {len(matches)}")
++    return matches[0]
++
++
++def include_paths(command, cwd):
++    paths = []
++    index = 0
++    while index < len(command):
++        token = command[index]
++        if token == "-I":
++            index += 1
++            paths.append((cwd / command[index]).resolve())
++        elif token.startswith("-I"):
++            paths.append((cwd / token[2:]).resolve())
++        index += 1
++    return paths
++
++
++def compile_internal(command, cwd, original, source, output, log):
++    command = list(command)
++    command[command.index(original)] = str(source)
++    for index, token in enumerate(command):
++        if token == "-o":
++            command[index + 1] = str(output)
++        elif token in ("-MF", "-MT"):
++            command[index + 1] = str(output) + ".d"
++    run(command, log, cwd)
++    return {"cwd": str(cwd), "argv": command}
++
++
++def main():
++    repo = Path(__file__).resolve().parents[1]
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--ogkm", type=Path, required=True)
++    parser.add_argument("--out", type=Path, required=True)
++    parser.add_argument("--src", type=Path, default=repo / "kexts/NVRM")
++    parser.add_argument("--jobs", type=int, default=6)
++    parser.add_argument("--reference", type=Path,
++                        help="optional existing NVRM executable, read only for symbol comparison")
++    args = parser.parse_args()
++    ogkm, out, src = args.ogkm.resolve(), args.out.resolve(), args.src.resolve()
++    if args.jobs < 1:
++        parser.error("--jobs must be positive")
++    if sys.platform != "darwin":
++        parser.error("this development build requires macOS and Xcode")
++    if capture(["git", "rev-parse", "HEAD"], ogkm).strip() != OGKM_COMMIT:
++        parser.error("--ogkm must be NVIDIA's 610.57.04 commit")
++    # Restrict all generated output to a normal development directory.
++    for reserved in (Path("/System"), Path("/Library"), Path("/Volumes")):
++        if out == reserved or reserved in out.parents:
++            parser.error("--out must not be a system or mounted-volume directory")
++    out.mkdir(parents=True, exist_ok=True)
++    logs, objects = out / "logs", out / "objects"
++    logs.mkdir(exist_ok=True)
++    objects.mkdir(exist_ok=True)
++    sdk = Path(capture(["xcrun", "--show-sdk-path"]).strip())
++    compiler = capture(["xcrun", "clang", "--version"])
++    helper = out / "objects.mk"
++    helper.write_text(".PHONY: nvrm-local-objects nvrm-list-objects\n"
++                      "nvrm-local-objects: $(OBJS)\n"
++                      "nvrm-list-objects:\n\t@echo NM_OBJECTS=$(OBJS)\n")
++    make = ["make", "-f", "Makefile", "-f", str(helper), "CC=clang", "CXX=clang++",
++            "OUTPUTDIR=" + CORE_DIR, "EXTRA_CFLAGS=" + CORE_FLAGS]
++    rm, kms = ogkm / "src/nvidia", ogkm / "src/nvidia-modeset"
++    core_commands, archives = [], []
++    for directory, archive in ((rm, "libnvkernel.a"), (kms, "libnvkms.a")):
++        # The five shader ELF wrappers are replaced by nvkms_shaders.cpp.
++        base = make + (["SHADER_OBJS="] if directory == kms else [])
++        print(f"Building {directory.name} objects...", flush=True)
++        argv = base + ["-j" + str(args.jobs), "nvrm-local-objects"]
++        run(argv, logs / (directory.name + "-objects.log"), directory)
++        core_commands.append({"cwd": str(directory), "argv": argv})
++        listing = capture(base + ["nvrm-list-objects"], directory)
++        line = next(line for line in listing.splitlines() if line.startswith("NM_OBJECTS="))
++        members = [(directory / item).resolve() for item in line[11:].split()]
++        for member in members:
++            with member.open("rb") as stream:
++                if stream.read(4) != b"\xcf\xfa\xed\xfe":
++                    raise RuntimeError(f"not a 64-bit Mach-O object: {member}")
++        library = out / archive
++        argv = ["xcrun", "libtool", "-static", "-o", str(library)] + list(map(str, members))
++        run(argv, logs / (archive + ".log"))
++        archives.append(library)
++    rm_command = object_command(make, rm, "arch/nvalloc/unix/src/osapi.c",
++                                CORE_DIR + "/osapi.o", logs)
++    kms_command = object_command(make + ["SHADER_OBJS="], kms, "kapi/src/nvkms-kapi.c",
++                                 CORE_DIR + "/nvkms-kapi.o", logs)
++    # v1.2.0 pairs the allocation-cookie ABI with this upstream completion fix.
++    # Apply it only to an output-directory copy; never modify the vendor tree.
++    completion_patch = src / "patches/610-display-completion.patch"
++    completion_source = out / "completion/nvkms-kapi.c"
++    completion_source.parent.mkdir(exist_ok=True)
++    shutil.copy2(kms / "kapi/src/nvkms-kapi.c", completion_source)
++    run(["patch", "--batch", "--forward", str(completion_source), str(completion_patch)],
++        logs / "completion-patch.log")
++    completion_object = completion_source.with_suffix(".o")
++    completion_command = compile_internal(kms_command, kms, "kapi/src/nvkms-kapi.c",
++        completion_source, completion_object, logs / "completion-compile.log")
++    run(["ar", "r", str(archives[1]), str(completion_object)], logs / "completion-archive.log")
++    run(["ranlib", str(archives[1])], logs / "completion-ranlib.log")
++    # accel_build.sh can reuse precisely the same RM defines through RM_COMMANDS.
++    (out / "rm-compile-command.sh").write_text(shlex.join(rm_command) + "\n")
++    includes = [src] + include_paths(rm_command, rm) + include_paths(kms_command, kms)
++    includes = list(dict.fromkeys(includes))
++    defines = [token for token in rm_command
++               if token.startswith("-D") and token not in ("-DNVRM", "-D_LANGUAGE_C")]
++    flags = ["-arch", "x86_64", "-fapple-kext", "-mkernel", "-nostdinc",
++             "-I" + str(sdk / "System/Library/Frameworks/Kernel.framework/Headers")]
++    flags += ["-I" + str(path) for path in includes]
++    flags += ["-DKERNEL", "-DKERNEL_PRIVATE", "-DDRIVER_PRIVATE", "-DAPPLE", "-DNeXT"]
++    flags += defines + ["-std=c++17", "-fno-rtti", "-fno-exceptions", "-fno-builtin",
++                       "-fno-common", "-Wall", "-Wno-unused-parameter",
++                       "-Wno-inconsistent-missing-override", "-Wno-unused-function", "-O2"]
++    commands = []
++    print("Building XNU adapter objects...", flush=True)
++    for name in CPP_SOURCES:
++        argv = ["xcrun", "clang++"] + flags + ["-c", str(src / name),
++                "-o", str(objects / (Path(name).stem + ".o"))]
++        run(argv, logs / (name + ".log"))
++        commands.append({"argv": argv})
++    for command, cwd, original, name in (
++        (rm_command, rm, "arch/nvalloc/unix/src/osapi.c", "nvrm_pageoff.c"),
++        (kms_command, kms, "kapi/src/nvkms-kapi.c", "nvrm_kapi_fields.c"),
++    ):
++        commands.append(compile_internal(command, cwd, original, src / name,
++                         objects / (Path(name).stem + ".o"), logs / (name + ".log")))
++    contents = out / "NVRM.kext/Contents"
++    (contents / "MacOS").mkdir(parents=True, exist_ok=True)
++    shutil.copy2(src / "Info.plist", contents / "Info.plist")
++    executable = contents / "MacOS/NVRM"
++    # Ordinary archive resolution avoids the duplicate nvstatus.c in RM/KMS.
++    link = ["xcrun", "clang++", "-arch", "x86_64", "-fapple-kext", "-nostdlib",
++            "-Xlinker", "-kext", "-lkmodc++", "-lkmod", "-lcc_kext"]
++    link += [str(objects / (Path(name).stem + ".o"))
++             for name in CPP_SOURCES + ["nvrm_pageoff.c", "nvrm_kapi_fields.c"]]
++    link += list(map(str, archives)) + ["-o", str(executable)]
++    run(link, logs / "link.log")
++    run(["plutil", "-lint", str(contents / "Info.plist")], logs / "plist.log")
++    undefined = sorted(capture(["nm", "-u", str(executable)]).splitlines())
++    internal = [s for s in undefined if re.match(r"^_(nv|rm|port|ceutils|memdesc)", s)]
++    manifest = {
++        "ogkm_commit": OGKM_COMMIT, "core_flags": CORE_FLAGS,
++        "ogkm_dirty": capture(["git", "status", "--porcelain"], ogkm),
++        "sdk": str(sdk), "compiler": compiler, "source": str(src),
++        "source_sha256": {str(p.relative_to(src)): digest(p) for p in src.rglob("*") if p.is_file()},
++        "core_commands": core_commands, "adapter_commands": commands, "link_command": link,
++        "completion": {
++            "patch": str(completion_patch), "patch_sha256": digest(completion_patch),
++            "source": str(completion_source), "source_sha256": digest(completion_source),
++            "object_sha256": digest(completion_object), "archive_sha256": digest(archives[1]),
++            "command": completion_command,
++        },
++        "executable": str(executable), "sha256": digest(executable),
++        "undefined": undefined, "unexpected_internal_undefined": internal,
++        "validation_scope": "offline build and symbol inspection only; not installed or loaded",
++    }
++    if args.reference:
++        previous = set(capture(["nm", "-u", str(args.reference.resolve())]).splitlines())
++        manifest["reference"] = str(args.reference.resolve())
++        manifest["reference_sha256"] = digest(args.reference.resolve())
++        manifest["undefined_added"] = sorted(set(undefined) - previous)
++        manifest["undefined_removed"] = sorted(previous - set(undefined))
++    (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
++    if internal:
++        raise RuntimeError(f"unresolved NVIDIA internal symbols: {internal}")
++    print(f"Built {executable}\nSHA-256 {manifest['sha256']}\n"
++          f"External symbols: {len(undefined)}; see {out / 'manifest.json'}")
++
++
++if __name__ == "__main__":
++    try:
++        main()
++    except (RuntimeError, subprocess.CalledProcessError, OSError) as error:
++        print(error, file=sys.stderr)
++        sys.exit(1)
+diff --git a/kexts/NVRM/NVRM.cpp b/kexts/NVRM/NVRM.cpp
+--- a/kexts/NVRM/NVRM.cpp
++++ b/kexts/NVRM/NVRM.cpp
+@@ -6,6 +6,7 @@
+ 
+ #include "nvrm_off.h"
+ #include "nv-xnu.h"
++#include "nvrm_headless_device.h"
+ #include <IOKit/IOService.h>
+ #include <IOKit/IOUserClient.h>
+ #include <IOKit/IOSubMemoryDescriptor.h>
+@@ -43,6 +44,12 @@
+ }
+ 
+ #define LOG(fmt, ...) do { kprintf("NVRM-xnu: " fmt "\n", ##__VA_ARGS__); IOLog("NVRM-xnu: " fmt "\n", ##__VA_ARGS__); } while (0)
++
++struct NVRMHeadlessLockGuard {
++    IOLock *lock;
++    explicit NVRMHeadlessLockGuard(IOLock *p) : lock(p) { if (lock) IOLockLock(lock); }
++    ~NVRMHeadlessLockGuard() { if (lock) IOLockUnlock(lock); }
++};
+ 
+ struct nvkms_per_open;
+ extern "C" { NvBool nvkms_xnu_load(void); struct nvkms_per_open *nvkms_xnu_open(int pid); void nvkms_xnu_close(struct nvkms_per_open *);
+@@ -96,6 +103,7 @@
+     virtual IOService *probe(IOService *provider, SInt32 *score) override;
+     virtual bool start(IOService *provider) override;
+     virtual void stop(IOService *provider) override;
++    virtual void free() override;
+     IOReturn go(uint32_t pass);
+     static void autoGo(void *p0, wait_result_t w);
+     static void bootHoldCap(thread_call_param_t p0, thread_call_param_t p1);
+@@ -106,6 +114,9 @@
+     static void headWatch(void *p0, wait_result_t w);
+     IOBufferMemoryDescriptor *fBootScreen = nullptr; uint32_t fBootW = 0, fBootH = 0, fBootPitch = 0;
+     uint32_t     fAutoGoSettleMs = 10000;
++    bool         fHeadlessMode = false;
++    bool         fHeadlessStopping = false;
++    IOLock      *fHeadlessGoLock = nullptr;
+     volatile UInt32 fBootHold = 0;
+     virtual IOReturn callPlatformFunction(const OSSymbol *fn, bool wait,
+                                          void *p1, void *p2, void *p3, void *p4) override;
+@@ -260,6 +271,7 @@
+ IOService *NVRM::probe(IOService *provider, SInt32 *score)
+ {
+     { if (nvrm_driver_off()) return NULL; }
++    if (!nvHeadlessProviderAllowed(provider)) return NULL;
+     IOService *res = super::probe(provider, score);
+     IOPCIDevice *pci = OSDynamicCast(IOPCIDevice, provider);
+     if (!pci) return NULL;
+@@ -282,6 +294,14 @@
+ bool NVRM::start(IOService *provider)
+ {
+     { if (nvrm_driver_off()) return false; }
++    if (!nvHeadlessProviderAllowed(provider)) return false;
++    unsigned headless = 0;
++    const bool headlessPresent = PE_parse_boot_argn("nvheadless", &headless, sizeof headless);
++    fHeadlessMode = nvHeadlessBootValue(headlessPresent, headless);
++    if (fHeadlessMode) {
++        if (!fHeadlessGoLock) fHeadlessGoLock = IOLockAlloc();
++        if (!fHeadlessGoLock) return false;
++    }
+     if (!super::start(provider)) return false;
+     fPCI = OSDynamicCast(IOPCIDevice, provider);
+     if (!fPCI) return false;
+@@ -301,7 +321,8 @@
+     nv->handle = os_pci_init_handle(0, bus, dev, fn, NULL, NULL);
+     nv->regs = &nv->bars[NV_GPU_BAR_INDEX_REGS];
+     nv->fb   = &nv->bars[NV_GPU_BAR_INDEX_FB];
+-    snapshotBootScreen();
++    if (fHeadlessMode) setProperty(NVRM_RM_READY_PROPERTY, kOSBooleanFalse);
++    else snapshotBootScreen();
+     const bool bar1Placed = placeLargeBar1();
+     readBARs();
+     {
+@@ -530,9 +551,11 @@
+     } else {
+         IOSleep(s->fAutoGoSettleMs);
+     }
+-    s->measureBootRaster();
+-    { thread_t hw = THREAD_NULL; s->retain();
+-      if (kernel_thread_start(&NVRM::headWatch, s, &hw) == KERN_SUCCESS) thread_deallocate(hw); else s->release(); }
++    if (!s->fHeadlessMode) {
++        s->measureBootRaster();
++        thread_t hw = THREAD_NULL; s->retain();
++        if (kernel_thread_start(&NVRM::headWatch, s, &hw) == KERN_SUCCESS) thread_deallocate(hw); else s->release();
++    }
+     IOReturn r = s->go(2);
+     kprintf("NVRM-xnu: auto-go: go(2) -> 0x%x (fPassDone %u)\n", r, s->fPassDone);
+     if (r != kIOReturnSuccess) {
+@@ -540,6 +563,13 @@
+         s->releaseBootHold("go(2) failed");
+     } else {
+         s->setProperty("nvrm-autogo", "up");
++        if (s->fHeadlessMode) {
++            int err = nvrmSysW("debug.nvaccel_headless", 1);
++            s->setProperty("nvrm-display", "headless: display stack disabled");
++            LOG("auto-go: headless publication request -> %d; no framebuffer, AGDC, IOP or flip bring-up", err);
++            s->releaseBootHold("headless RM ready");
++            s->release(); thread_terminate(current_thread()); return;
++        }
+         int want = 1; if (!PE_parse_boot_argn("nvfbheads", &want, sizeof(want)) || want < 1) want = 1;
+         int mask = 0, last = -1, still = 0, i;
+         for (i = 0; i < 20; i++) {
+@@ -865,6 +895,8 @@
+ 
+ IOReturn NVRM::go(uint32_t pass)
+ {
++    NVRMHeadlessLockGuard headlessGuard(fHeadlessMode ? fHeadlessGoLock : nullptr);
++    if (fHeadlessMode && (!fHeadlessGoLock || fHeadlessStopping)) return kIOReturnNotReady;
+     static bool gGoBusy;
+     { IOLockLock(gNvClientsLock); bool busy = gGoBusy; if (!busy) gGoBusy = true; IOLockUnlock(gNvClientsLock); if (busy) { kprintf("NVRM-xnu: go(%u) refused: another go is running\n", pass); return kIOReturnBusy; } }
+     struct Unbusy { ~Unbusy() { IOLockLock(gNvClientsLock); gGoBusy = false; IOLockUnlock(gNvClientsLock); } } unbusy;
+@@ -946,7 +978,14 @@
+                     (unsigned)qst, (unsigned)ramKb);
+             }
+         }
+-        if (nvkms_xnu_load()) nvrm_display_publish(this, fNv.gpu_id);
++        if (fHeadlessMode) {
++            // NVMTL's RM bridge/escape path uses PASS 2 directly. The separate
++            // framebuffer-backed KAPI/GPUVA/display path is intentionally absent.
++            if (setProperty(NVRM_RM_READY_PROPERTY, kOSBooleanTrue)) {
++                int err = nvrmSysW("debug.nvaccel_headless", 1);
++                LOG("headless RM ready: publication request -> %d (NVAccel may start later)", err);
++            } else LOG("headless: failed to publish RM readiness; Metal remains withheld");
++        } else if (nvkms_xnu_load()) nvrm_display_publish(this, fNv.gpu_id);
+     }
+     return kIOReturnSuccess;
+ }
+@@ -969,6 +1008,17 @@
+ 
+ void NVRM::stop(IOService *provider)
+ {
++    if (fHeadlessMode) {
++        // Clear readiness before waiting for NVAccel's publication lock. A
++        // publisher already holding it can finish while RM is still alive;
++        // this synchronous withdrawal then runs before RM shutdown.
++        if (fHeadlessGoLock) IOLockLock(fHeadlessGoLock);
++        fHeadlessStopping = true;
++        fPassDone = 0;
++        removeProperty(NVRM_RM_READY_PROPERTY);
++        if (fHeadlessGoLock) IOLockUnlock(fHeadlessGoLock);
++        nvrmSysW("debug.nvaccel_headless", 0);
++    }
+     if (fAdapter) { rm_shutdown_adapter(NULL, &fNv); fAdapter = false; }
+     if (fIntSrc) { fIntSrc->disable(); if (fWorkLoop) fWorkLoop->removeEventSource(fIntSrc); fIntSrc->release(); fIntSrc = NULL; }
+     if (fWorkLoop) { fWorkLoop->release(); fWorkLoop = NULL; }
+@@ -976,6 +1026,12 @@
+     super::stop(provider);
+ }
+ 
++void NVRM::free()
++{
++    if (fHeadlessGoLock) { IOLockFree(fHeadlessGoLock); fHeadlessGoLock = nullptr; }
++    super::free();
++}
++
+ #undef super
+ #define super IOUserClient
+ OSDefineMetaClassAndStructors(NVRMUserClient, IOUserClient)
+@@ -983,7 +1039,20 @@
+ class IOAccelNVRMBridge : public NVRMUserClient {
+     OSDeclareDefaultStructors(IOAccelNVRMBridge)
+ public:
+-    void setOwner(NVRM *o) { fOwner = o; }
++    void setOwner(NVRM *o) {
++        if (o) o->retain();
++        NVRM *old = fOwner;
++        fOwner = o;
++        if (old) old->release();
++    }
++    void free() override {
++        // The bridge attaches to NVAccel's carrier, not to its RM owner.
++        // Keep RM alive through base cleanup; use only the saved local after
++        // super::free, which can destroy this bridge's storage.
++        NVRM *owner = fOwner;
++        NVRMUserClient::free();
++        if (owner) owner->release();
++    }
+     bool start(IOService *provider) override {
+         if (!fOwner) { kprintf("NVRM-xnu: bridge started with no owner\n"); return false; }
+         return IOUserClient::start(provider);
+@@ -1010,6 +1079,12 @@
+         return kIOReturnSuccess;
+     }
+     if (fn && fn->isEqualTo("nvNewAccelClient")) {
++        // NVAccel drops its publication lock before calling us. Use the same
++        // lock as go/stop so readiness cannot be revoked halfway through init.
++        NVRMHeadlessLockGuard headlessGuard(fHeadlessMode ? fHeadlessGoLock : nullptr);
++        if (fHeadlessMode && (!fHeadlessGoLock || fHeadlessStopping || fPassDone < 2 ||
++                             getProperty(NVRM_RM_READY_PROPERTY) != kOSBooleanTrue))
++            return kIOReturnNotReady;
+         IOUserClient **out = (IOUserClient **)p3;
+         if (!out) return kIOReturnBadArgument;
+         *out = NULL;
+diff --git a/kexts/NVRM/accel/nvrm-accel.cpp b/kexts/NVRM/accel/nvrm-accel.cpp
+--- a/kexts/NVRM/accel/nvrm-accel.cpp
++++ b/kexts/NVRM/accel/nvrm-accel.cpp
+@@ -20,6 +20,7 @@
+ #include "IOAccelTask.h"
+ #include "IOAccelMemoryMap.h"
+ #include "../nvrm_gpuva_abi.h"
++#include "../nvrm_headless_device.h"
+ class NVMemoryMap;
+ static unsigned long long nvAccelGpuVaAlloc(IOAccelMemoryMap *map,
+                                            unsigned long long len, unsigned long long align);
+@@ -45,11 +46,29 @@
+ static const unsigned kNvMaxFB = 4;
+ static unsigned gNvHeadsPublished = 0, gNvHeadsRegistered = 0;
+ static unsigned gNvHeadsPiped = 0;
++static IOLock *gHeadlessLock = nullptr;
++static int gNvHeadlessPublished = 0;
++static void nvaccelInstallHeadlessSysctl(void);
++static bool nvaccelHeadlessShutdown(void);
++static bool nvAccelHeadlessRequested(void)
++{
++    unsigned value = 0;
++    bool present = PE_parse_boot_argn("nvheadless", &value, sizeof value);
++    return nvHeadlessBootValue(present, value);
++}
+ 
+ extern "C" kern_return_t _start(kmod_info_t *ki, void *d); extern "C" kern_return_t _stop(kmod_info_t *ki, void *d);
+ extern "C" { KMOD_EXPLICIT_DECL(com.nullmoth.NVAccel, "0.1", _start, _stop) }
+-extern "C" kern_return_t _start(kmod_info_t *ki, void *d) { return KERN_SUCCESS; }
+-extern "C" kern_return_t _stop(kmod_info_t *ki, void *d)  { return KERN_SUCCESS; }
++extern "C" kern_return_t _start(kmod_info_t *ki, void *d) {
++    if (nvAccelHeadlessRequested()) {
++        gHeadlessLock = IOLockAlloc();
++        if (!gHeadlessLock) return KERN_FAILURE;
++    }
++    return KERN_SUCCESS;
++}
++extern "C" kern_return_t _stop(kmod_info_t *ki, void *d) {
++    return nvaccelHeadlessShutdown() ? KERN_SUCCESS : KERN_FAILURE;
++}
+ 
+ class NVEventMachine : public IOAccelEventMachineFast2 {
+     OSDeclareDefaultStructors(NVEventMachine)
+@@ -74,6 +93,10 @@
+     OSDeclareDefaultStructors(NVDisplayMachine)
+     NM_TAHOE_FWD(NVDisplayMachine)
+ public:
++    void found_framebuffer(IOFramebuffer *fb) APPLE_KEXT_OVERRIDE {
++        if (nvAccelHeadlessRequested()) return;
++        IOAccelLegacyDisplayMachine::found_framebuffer(fb);
++    }
+     bool displayModeWillChange() APPLE_KEXT_OVERRIDE { ALOG("DM displayModeWillChange"); return true; }
+     bool displayModeDidChange() APPLE_KEXT_OVERRIDE {
+         ALOG("DM displayModeDidChange -> true");
+@@ -217,10 +240,82 @@
+     unsigned fFBRegistered = 0;
+     IOLock *fRegLock = nullptr;
+     OSObject *fMetalPlugin = nullptr;
++    bool fHeadlessMode = false;
++    bool fHeadlessStarted = false;
++    bool fHeadlessStopping = false;
++    bool withholdHeadlessPlugin() {
++        OSObject *plugin = copyProperty("MetalPluginName");
++        if (plugin) {
++            if (!fMetalPlugin) fMetalPlugin = plugin;
++            else plugin->release();
++        }
++        removeProperty("MetalPluginName");
++        // This describes the service's lifetime mode, not publication state.
++        // A client with cached discovery must still reject display ownership
++        // after MetalPluginName is withdrawn or RM begins stopping.
++        return setProperty(NVACCEL_HEADLESS_PROPERTY, kOSBooleanTrue);
++    }
++    void releaseHeadlessPlugin() {
++        removeProperty("MetalPluginName");
++        removeProperty(NVACCEL_HEADLESS_PROPERTY);
++        if (fMetalPlugin) { fMetalPlugin->release(); fMetalPlugin = nullptr; }
++    }
++    IOService *copySamePciRm() {
++        if (!fPCI) return nullptr;
++        OSIterator *children = fPCI->getChildIterator(gIOServicePlane);
++        if (!children) return nullptr;
++        IOService *found = nullptr;
++        while (OSObject *object = children->getNextObject()) {
++            IOService *service = OSDynamicCast(IOService, object);
++            if (service && service->metaCast("NVRM") && service->getProvider() == fPCI) {
++                service->retain(); found = service; break;
++            }
++        }
++        children->release();
++        return found;
++    }
++    // Caller holds gHeadlessLock, including during stop and sysctl publication.
++    int setHeadlessLocked(int value) {
++        if (value == 0) {
++            removeProperty("MetalPluginName");
++            if (gAccel == this) gNvHeadlessPublished = 0;
++            return 0;
++        }
++        if (value != 1) return EINVAL;
++        IOService *rm = copySamePciRm();
++        const bool samePci = rm && rm->getProvider() == fPCI;
++        const bool ready = samePci && !rm->isInactive() && rm->getProperty(NVRM_RM_READY_PROPERTY) == kOSBooleanTrue;
++        if (rm) rm->release();
++        OSString *plugin = OSDynamicCast(OSString, fMetalPlugin);
++        bool framebufferSeen = fFB || fFBRegistered || gNvHeadsPublished || gNvHeadsRegistered || gNvHeadsPiped;
++        for (unsigned i = 0; i < kNvMaxFB; ++i) framebufferSeen |= fFBs[i] != nullptr;
++        const NvHeadlessPublicationInputs input = {
++            fHeadlessMode && nvAccelHeadlessRequested(), fHeadlessStarted, fHeadlessStopping,
++            samePci, ready, plugin && plugin->getLength() != 0, framebufferSeen,
++            fDM ? fDM->getFramebufferCount() : ~0u
++        };
++        if (!nvHeadlessMayPublish(input)) return EAGAIN;
++        if (gNvHeadlessPublished) return 0;
++        if (getProperty(NVACCEL_HEADLESS_PROPERTY) != kOSBooleanTrue) return EAGAIN;
++        if (!setProperty("MetalPluginName", fMetalPlugin)) return ENOMEM;
++        gNvHeadlessPublished = 1;
++        ALOG("headless Metal published after same-PCI RM readiness; display/AGDC/IOP/flip gates remain closed");
++        return 0;
++    }
++    static int requestHeadless(int value) {
++        if (value != 0 && value != 1) return EINVAL;
++        if (!nvAccelHeadlessRequested()) return EPERM;
++        if (!gHeadlessLock) return ENXIO;
++        IOLockLock(gHeadlessLock);
++        NVAccel *a = gAccel;
++        int result = a && a->fHeadlessMode ? a->setHeadlessLocked(value) : ENXIO;
++        IOLockUnlock(gHeadlessLock);
++        return result;
++    }
+     static bool fbPublished(void *target, void *ref, IOService *newService, IONotifier *note) {
+         (void)ref; (void)note;
+         NVAccel *me = (NVAccel *)target;
+-        if (!me || !newService) return true;
++        if (!me || !newService || me->fHeadlessMode) return true;
+         unsigned idx = 0;
+         OSNumber *num = OSDynamicCast(OSNumber, newService->getProperty("IOFBDependentIndex"));
+         if (num) idx = num->unsigned32BitValue();
+@@ -322,6 +417,7 @@
+         return added;
+     }
+     void onCountGrewLocked() {
++        if (fHeadlessMode) return;
+         deliverModeChange();
+         gNvAccelArmed = 1;
+         if (fMetalPlugin && !getProperty("MetalPluginName")) {
+@@ -342,6 +438,7 @@
+         if (fRegLock) IOLockUnlock(fRegLock);
+     }
+     bool registerFramebufferLocked(int how) {
++        if (fHeadlessMode) return false;
+         if (!fDM) { ALOG("registerFramebuffer(%d): no display machine", how); return false; }
+         if (!fFB) { ALOG("registerFramebuffer(%d): no framebuffer has published yet", how); return false; }
+         unsigned before = fDM->getFramebufferCount();
+@@ -393,18 +490,31 @@
+             return fr;
+         }
+ 
+-        if (!fNVRM) {
++        IOService *headlessRm = nullptr;
++        if (fHeadlessMode) {
++            if (!gHeadlessLock) return kIOReturnNotReady;
++            IOLockLock(gHeadlessLock);
++            if (!fHeadlessStopping) headlessRm = copySamePciRm();
++            bool ready = headlessRm && headlessRm->getProperty(NVRM_RM_READY_PROPERTY) == kOSBooleanTrue;
++            IOLockUnlock(gHeadlessLock);
++            if (!ready) {
++                if (headlessRm) headlessRm->release();
++                return kIOReturnNotReady;
++            }
++        } else if (!fNVRM) {
+             OSDictionary *m = serviceMatching("NVRM");
+             if (m) fNVRM = waitForMatchingService(m, 100ULL * 1000 * 1000);
+         }
+-        if (!fNVRM) { ALOG("newUserClient(0x%x): no NVRM service", type); return kIOReturnNotAttached; }
++        IOService *rm = headlessRm ? headlessRm : fNVRM;
++        if (!rm) { ALOG("newUserClient(0x%x): no NVRM service", type); return kIOReturnNotAttached; }
+ 
+         const OSSymbol *fnSym = OSSymbol::withCStringNoCopy("nvNewAccelClient");
+-        if (!fnSym) return kIOReturnNoMemory;
++        if (!fnSym) { if (headlessRm) headlessRm->release(); return kIOReturnNoMemory; }
+         IOUserClient *uc = nullptr;
+-        IOReturn r = fNVRM->callPlatformFunction(fnSym, false, (void *)owningTask,
++        IOReturn r = rm->callPlatformFunction(fnSym, false, (void *)owningTask,
+                                                  (void *)(uintptr_t)(type & 0xFFFFu), &uc, nullptr);
+         fnSym->release();
++        if (headlessRm) headlessRm->release();
+         if (r != kIOReturnSuccess || !uc) { ALOG("newUserClient(0x%x): NVRM refused (0x%x)", type, r); return r ? r : kIOReturnNoResources; }
+ 
+         IOService *carrier = nullptr;
+@@ -423,6 +533,7 @@
+         return kIOReturnSuccess;
+     }
+     static void triggerFromSysctl(int how) {
++        if (nvAccelHeadlessRequested()) return;
+         if (!gAccel) { ALOG("sysctl debug.nvaccelfb=%d but no NVAccel is running", how); return; }
+         if (how >= 4) gNvAperture = 1;
+         if (how >= 3) {
+@@ -452,6 +563,8 @@
+     unsigned fEnableCount = 0;
+     unsigned fUcLogged = 0;
+     virtual IOService *probe(IOService *provider, SInt32 *score) APPLE_KEXT_OVERRIDE {
++        if (nvrm_driver_off()) return NULL;
++        if (!nvHeadlessProviderAllowed(provider)) return NULL;
+         ALOG("probe(%s) score %d", provider ? provider->getName() : "?", score ? (int)*score : 0);
+         if (IOPCIDevice *pci = OSDynamicCast(IOPCIDevice, provider)) {
+             const unsigned cls = pci->configRead8(0x0B), sub = pci->configRead8(0x0A);
+@@ -463,18 +576,39 @@
+             }
+             ALOG("NVIDIA display device %04x:%04x class %02x.%02x - claiming", ven, dev, cls, sub);
+         }
+-        return IOGraphicsAccelerator2::probe(provider, score);
++        fHeadlessMode = nvAccelHeadlessRequested();
++        if (fHeadlessMode && !withholdHeadlessPlugin()) {
++            releaseHeadlessPlugin();
++            return nullptr;
++        }
++        IOService *result = IOGraphicsAccelerator2::probe(provider, score);
++        if (!result && fHeadlessMode) releaseHeadlessPlugin();
++        return result;
+     }
+     virtual bool start(IOService *provider) APPLE_KEXT_OVERRIDE {
+-        { if (nvrm_driver_off()) return false; }
++        if (nvrm_driver_off()) return false;
++        if (!nvHeadlessProviderAllowed(provider)) return false;
++        fHeadlessMode = nvAccelHeadlessRequested();
++        // Personality properties exist before the base start/register path.
++        // Remove the discovery key before waiting for RM or invoking that path.
++        if (fHeadlessMode) {
++            if (!withholdHeadlessPlugin()) { releaseHeadlessPlugin(); return false; }
++            fPCI = OSDynamicCast(IOPCIDevice, provider);
++            if (!gHeadlessLock || !fPCI) { releaseHeadlessPlugin(); return false; }
++        }
+         uint32_t gate = 0;
+-        if (!PE_parse_boot_argn("nvaccel", &gate, sizeof gate) || !gate) { ALOG("boot-arg nvaccel=1 absent: NOT starting (boot-loop guard)"); return false; }
++        if (!PE_parse_boot_argn("nvaccel", &gate, sizeof gate) || !gate) {
++            ALOG("boot-arg nvaccel=1 absent: NOT starting (boot-loop guard)");
++            if (fHeadlessMode) releaseHeadlessPlugin();
++            return false;
++        }
+         if (IOPCIDevice *pci = OSDynamicCast(IOPCIDevice, provider)) {
+             unsigned waited = 0;
+             while (pci->getProperty("nvrm-claimed") != kOSBooleanTrue && waited < 300) { IOSleep(100); waited++; }
+             if (pci->getProperty("nvrm-claimed") != kOSBooleanTrue) {
+                 ALOG("NVRM never claimed %04x:%04x in 30 s - NOT starting the accelerator on a GPU with no RM",
+                      pci->configRead16(0x00), pci->configRead16(0x02));
++                if (fHeadlessMode) releaseHeadlessPlugin();
+                 return false;
+             }
+             ALOG("NVRM owns %04x:%04x (waited %u ms) - starting", pci->configRead16(0x00), pci->configRead16(0x02), waited * 100);
+@@ -482,9 +616,28 @@
+         ALOG("start(%s): calling IOGraphicsAccelerator2::start — the family's own bring-up", provider ? provider->getName() : "?");
+         bool r = IOGraphicsAccelerator2::start(provider);
+         ALOG("IOGraphicsAccelerator2::start -> %d", r);
++        if (!r && fHeadlessMode) releaseHeadlessPlugin();
+         if (r) {
+-            registerService(); ALOG("registerService() called — Metal can now find MetalPluginName=%s", "NVMTLDriver");
+-            gAccel = this; gEnableAccel = &NVAccel::enableFromHook;
++            if (fHeadlessMode) {
++                // The base must not have restored the discovery property.
++                if (!withholdHeadlessPlugin()) {
++                    IOGraphicsAccelerator2::stop(provider);
++                    releaseHeadlessPlugin();
++                    return false;
++                }
++                IOLockLock(gHeadlessLock);
++                if (gAccel && gAccel != this) {
++                    IOLockUnlock(gHeadlessLock);
++                    IOGraphicsAccelerator2::stop(provider);
++                    releaseHeadlessPlugin();
++                    return false;
++                }
++                gAccel = this; gEnableAccel = &NVAccel::enableFromHook;
++                IOLockUnlock(gHeadlessLock);
++            } else {
++                registerService(); ALOG("registerService() called — Metal can now find MetalPluginName=%s", "NVMTLDriver");
++                gAccel = this; gEnableAccel = &NVAccel::enableFromHook;
++            }
+             for (unsigned i = 0; i < NV_CARRIERS; i++) {
+                 IOAccelNVRMCarrier *c = OSTypeAlloc(IOAccelNVRMCarrier);
+                 if (!c) break;
+@@ -499,6 +652,22 @@
+             enableFromHook("start");
+             fPCI = OSDynamicCast(IOPCIDevice, provider);
+             ALOG("display machine framebuffer count after the family sweep = %u", fDM ? fDM->getFramebufferCount() : 0xFFFFFFFFu);
++            if (fHeadlessMode) {
++                if (!fCarriers[0]) {
++                    stop(provider);
++                    releaseHeadlessPlugin();
++                    return false;
++                }
++                // No FB notifier, family registration trigger, or display sysctls.
++                nvaccelInstallHeadlessSysctl();
++                registerService();
++                IOLockLock(gHeadlessLock);
++                fHeadlessStarted = true;
++                int result = setHeadlessLocked(1);
++                IOLockUnlock(gHeadlessLock);
++                ALOG("headless start complete: publication request -> %d (RM may become ready later)", result);
++                return true;
++            }
+             fRegLock = IOLockAlloc();
+             ALOG("multi-head: up to %u heads, registration lock %p%s", kNvMaxFB, fRegLock,
+                  fRegLock ? "" : " -- NULL: two sysctl writers could interleave a registration");
+@@ -519,7 +688,21 @@
+         }
+         return r;
+     }
+-    virtual void stop(IOService *provider) APPLE_KEXT_OVERRIDE { ALOG("stop"); IOGraphicsAccelerator2::stop(provider); }
++    virtual void stop(IOService *provider) APPLE_KEXT_OVERRIDE {
++        if (fHeadlessMode && gHeadlessLock) {
++            IOLockLock(gHeadlessLock);
++            fHeadlessStopping = true;
++            fHeadlessStarted = false;
++            setHeadlessLocked(0);
++            if (gAccel == this) { gAccel = nullptr; gEnableAccel = nullptr; }
++            IOLockUnlock(gHeadlessLock);
++        }
++        ALOG("stop"); IOGraphicsAccelerator2::stop(provider);
++    }
++    virtual void free() APPLE_KEXT_OVERRIDE {
++        if (fHeadlessMode) releaseHeadlessPlugin();
++        IOGraphicsAccelerator2::free();
++    }
+     virtual IOReturn callPlatformFunction(const OSSymbol *fn, bool wait, void *p1, void *p2, void *p3, void *p4) APPLE_KEXT_OVERRIDE;
+ };
+ OSDefineMetaClassAndStructors(NVAccel, IOGraphicsAccelerator2)
+@@ -871,12 +1054,63 @@
+     int v = gNvAccelArmed;
+     int err = sysctl_handle_int(oidp, &v, 0, req);
+     if (err || req->newptr == 0) return err;
++    if (nvAccelHeadlessRequested()) return v == 0 ? 0 : EPERM;
+     NVAccel::triggerFromSysctl(v);
+     return 0;
+ }
+ SYSCTL_PROC(_debug, OID_AUTO, nvaccelfb, CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN,
+             NULL, 0, nvaccelfb_sysctl, "I",
+             "register the NVIDIA framebuffer with the accelerator display machine (1 = found_framebuffer, 2 = family sweep)");
++
++static int nvaccel_headless_sysctl SYSCTL_HANDLER_ARGS
++{
++    int value = 0;
++    if (gHeadlessLock) {
++        IOLockLock(gHeadlessLock);
++        value = gNvHeadlessPublished;
++        IOLockUnlock(gHeadlessLock);
++    }
++    int err = sysctl_handle_int(oidp, &value, 0, req);
++    if (err || req->newptr == 0) return err;
++    return NVAccel::requestHeadless(value);
++}
++SYSCTL_PROC(_debug, OID_AUTO, nvaccel_headless, CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN,
++            NULL, 0, nvaccel_headless_sysctl, "I",
++            "nvheadless=1 only: publish Metal after same-PCI RM is ready, without display registration (0 withdraws)");
++static bool gHeadlessOidInstalled = false;
++static bool gHeadlessFbOidInstalled = false;
++static void nvaccelInstallHeadlessSysctl(void)
++{
++    if (!gHeadlessOidInstalled) {
++        sysctl_register_oid(&sysctl__debug_nvaccel_headless);
++        gHeadlessOidInstalled = true;
++    }
++    if (!gHeadlessFbOidInstalled) {
++        // Keep the familiar readback at zero; its handler refuses all arm requests.
++        sysctl_register_oid(&sysctl__debug_nvaccelfb);
++        gHeadlessFbOidInstalled = true;
++    }
++}
++static bool nvaccelHeadlessShutdown(void)
++{
++    if (gHeadlessLock) {
++        IOLockLock(gHeadlessLock);
++        bool active = NVAccel::gAccel != nullptr;
++        IOLockUnlock(gHeadlessLock);
++        if (active) return false;
++    }
++    // Unregister handlers before their lock or executable code can disappear.
++    if (gHeadlessOidInstalled) {
++        sysctl_unregister_oid(&sysctl__debug_nvaccel_headless);
++        gHeadlessOidInstalled = false;
++    }
++    if (gHeadlessFbOidInstalled) {
++        sysctl_unregister_oid(&sysctl__debug_nvaccelfb);
++        gHeadlessFbOidInstalled = false;
++    }
++    if (gHeadlessLock) { IOLockFree(gHeadlessLock); gHeadlessLock = nullptr; }
++    return true;
++}
+ #define NVACCEL_CNT(nm, var, desc) SYSCTL_QUAD(_debug, OID_AUTO, nm, CTLFLAG_RD | CTLFLAG_LOCKED, (SInt64 *)&var, desc)
+ NVACCEL_CNT(nvaccel_vm_alloc,         gCntVmAlloc,        "NVVidMemory::allocPhysical successes");
+ NVACCEL_CNT(nvaccel_vm_alloc_bytes,   gCntVmAllocBytes,   "bytes of VRAM granted to NVVidMemory");
+diff --git a/kexts/NVRM/nvrm_headless_device.h b/kexts/NVRM/nvrm_headless_device.h
+new file mode 100644
+--- /dev/null
++++ b/kexts/NVRM/nvrm_headless_device.h
+@@ -0,0 +1,16 @@
++/* The experimental headless path is qualified only for this Yoga's TU117. */
++#pragma once
++#include "nvrm_headless_policy.h"
++#include <IOKit/pci/IOPCIDevice.h>
++#include <pexpert/pexpert.h>
++
++static inline bool nvHeadlessProviderAllowed(IOService *provider)
++{
++    unsigned value = 0;
++    const bool present = PE_parse_boot_argn("nvheadless", &value, sizeof value);
++    if (!nvHeadlessBootValue(present, value)) return true;
++    IOPCIDevice *pci = OSDynamicCast(IOPCIDevice, provider);
++    return pci && pci->configRead16(0x00) == 0x10de &&
++           pci->configRead16(0x02) == 0x1f95 &&
++           (pci->configRead32(0x08) >> 8) == 0x030200;
++}
+diff --git a/kexts/NVRM/nvrm_headless_policy.h b/kexts/NVRM/nvrm_headless_policy.h
+new file mode 100644
+--- /dev/null
++++ b/kexts/NVRM/nvrm_headless_policy.h
+@@ -0,0 +1,28 @@
++/* Opt-in publication policy shared by the RM/accelerator and host tests. */
++#pragma once
++
++#define NVRM_RM_READY_PROPERTY "nvrm-rm-ready"
++#define NVACCEL_HEADLESS_PROPERTY "NVAccelHeadless"
++
++struct NvHeadlessPublicationInputs {
++    bool requested;
++    bool started;
++    bool stopping;
++    bool samePci;
++    bool rmReady;
++    bool pluginAvailable;
++    bool framebufferSeen;
++    unsigned framebufferCount;
++};
++
++static inline bool nvHeadlessBootValue(bool present, unsigned value)
++{
++    return present && value == 1;
++}
++
++static inline bool nvHeadlessMayPublish(const NvHeadlessPublicationInputs &in)
++{
++    return in.requested && in.started && !in.stopping && in.samePci &&
++           in.rmReady && in.pluginAvailable && !in.framebufferSeen &&
++           in.framebufferCount == 0;
++}

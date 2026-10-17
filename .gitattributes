@@ -1,0 +1,4 @@
+# Source patches and copied license text are byte-preserved evidence.
+# A blank context line in a unified patch intentionally contains one space.
+profiles/**/sources/patches/*.patch -whitespace
+profiles/**/sources/licenses/translator-COPYING.txt -whitespace

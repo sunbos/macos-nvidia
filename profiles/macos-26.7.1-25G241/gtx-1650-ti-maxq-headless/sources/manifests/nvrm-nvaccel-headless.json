@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "id": "nvrm-nvaccel-headless",
+  "base": {
+    "repository": "https://github.com/nullmoth/nvidia-macos-driver",
+    "commit": "c7dc26239bf85a648d5318fde135ebc09dc094a3"
+  },
+  "patch": "patches/nvrm-nvaccel-headless.patch",
+  "patch_sha256": "5a98e82419eb9de04d3ac435fd7552eafa0213290fd946b5061d78e6d55b7d84",
+  "selected_source_files": 6,
+  "changed_files": 6,
+  "files": [
+    {
+      "path": "build/accel_build.sh",
+      "base_sha256": "c41fe1d4e3020144bf24bb000dbcf53c395396ea825f93b5b3b3b71e1cc36ce1",
+      "source_sha256": "805cb98296590cfd95e6ebfc3dadc825427e54e9d9c50c0e4b6e1a2d02696ee6",
+      "bytes": 3117
+    },
+    {
+      "path": "build/build_nvrm_local.py",
+      "base_sha256": null,
+      "source_sha256": "6f10e6c429b19f0074c9f616b04812c9d2f54d874f5b89259e695004c66c1a2f",
+      "bytes": 11884
+    },
+    {
+      "path": "kexts/NVRM/NVRM.cpp",
+      "base_sha256": "20e31f989744645edaa5461d7d97659e0f861a01bbd5af24f27b2ad7e71f512a",
+      "source_sha256": "f7c25fb302f16128f588b1d9bc485d2b1244b2d54106c64180dd4d29b710093d",
+      "bytes": 76305
+    },
+    {
+      "path": "kexts/NVRM/accel/nvrm-accel.cpp",
+      "base_sha256": "87317f5394bf98d4158700b722930bdf54d220d2964abb50e52e2122cd136057",
+      "source_sha256": "9d024f61cff685bfd224268a973ffbc3315ca24bb7a7eb2df9b91e1a4997c6cd",
+      "bytes": 104873
+    },
+    {
+      "path": "kexts/NVRM/nvrm_headless_device.h",
+      "base_sha256": null,
+      "source_sha256": "e96a6a17e8628e66cdc38a7331364c9972132a9e156c602db6090a8ab6163540",
+      "bytes": 643
+    },
+    {
+      "path": "kexts/NVRM/nvrm_headless_policy.h",
+      "base_sha256": null,
+      "source_sha256": "206be4f9337c1267399b37a01639abcab313a904c72fc66f66e65d8ee543b87c",
+      "bytes": 777
+    }
+  ],
+  "verification_scope": "Selected source files only; apply check and exact output hashes, no build or runtime execution."
+}

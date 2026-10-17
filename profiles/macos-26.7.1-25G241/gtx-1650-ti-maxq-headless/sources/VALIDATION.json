@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "checked_at": "2026-10-17",
+  "scope": "Offline original-base patch application and source SHA-256 comparison only. No compiler, GPU, installation or system changes.",
+  "results": [
+    {
+      "component": "nvrm-nvaccel-headless",
+      "base_commit": "c7dc26239bf85a648d5318fde135ebc09dc094a3",
+      "patch_sha256": "5a98e82419eb9de04d3ac435fd7552eafa0213290fd946b5061d78e6d55b7d84",
+      "git_apply_check_exit_code": 0,
+      "git_apply_exit_code": 0,
+      "verified_source_files": 6,
+      "output_hash_mismatches": [],
+      "scope": "Offline source validation only; no build, GPU or installation."
+    },
+    {
+      "component": "nvmtl-observer",
+      "base_commit": "592b8df746371b523d5db0315f9794a57bff5c8e",
+      "patch_sha256": "0681cf7923185f6bfd7ca1ddddd8aba681043043d3eaf1e2763bb95685dc4a01",
+      "git_apply_check_exit_code": 0,
+      "git_apply_exit_code": 0,
+      "verified_source_files": 26,
+      "output_hash_mismatches": [],
+      "scope": "Offline source validation only; no build, GPU or installation."
+    },
+    {
+      "component": "air-translator-nested-switch",
+      "base_commit": "592b8df746371b523d5db0315f9794a57bff5c8e",
+      "patch_sha256": "91e79f5aee9fbaabd593aba3ccb6eec8534dac4415c9e3e1fa42b212807f7ec5",
+      "git_apply_check_exit_code": 0,
+      "git_apply_exit_code": 0,
+      "verified_source_files": 276,
+      "output_hash_mismatches": [],
+      "scope": "Offline source validation only; no build, GPU or installation."
+    },
+    {
+      "component": "nvk-mesa",
+      "base_commit": "17ca6174dcc6cb22059ac343bc29f8af7800f42e",
+      "patch_sha256": "e907eba3f0b070c61fad3107dfba4bf778417ed15729d371dde4015c023c3db9",
+      "git_apply_check_exit_code": 0,
+      "git_apply_exit_code": 0,
+      "verified_source_files": 81,
+      "output_hash_mismatches": [],
+      "scope": "Offline source validation only; no build, GPU or installation."
+    }
+  ],
+  "verification_tool": "verify_archive.py",
+  "verification_tool_sha256": "7810da5b0890c8432305dfa48fff4fa40600855e323c1de0c094060d1604945a",
+  "verification_tool_independently_reexecuted": true,
+  "incorrect_base_rejected": true,
+  "archive_checks": {
+    "json_parse": "passed",
+    "patch_sha256": "passed",
+    "patch_paths_match_manifest_changed_paths": "passed",
+    "component_counts": {
+      "kernel": 4,
+      "user": 7
+    },
+    "selected_text_file_count": 22,
+    "null_byte_scan": "passed",
+    "private_user_path_scan": "passed",
+    "machine_identity_key_scan": "passed",
+    "mac_address_scan": "passed",
+    "scope": "Scans of the explicitly archived source files, metadata and this document set; not a general audit of the upstream repository."
+  },
+  "codec_recipe_checks": {
+    "h264_encode_baseline_from_reverse_patch": "matched",
+    "h264_encode_pre_sign_sha256": "matched",
+    "h264_encode_signed_candidate_sha256": "matched",
+    "h264_decode_baseline_sha256": "matched",
+    "h264_decode_in_memory_patch_pre_sign_sha256": "matched",
+    "h264_decode_signed_candidate_sha256": "matched",
+    "pinned_license_and_notice_sha256": "matched",
+    "signed_again": false,
+    "binary_files_copied": false
+  },
+  "frozen_manifest_comparison": {
+    "nvmtl_plugin_files_matched": 26,
+    "nvmtl_external_vulkan_headers_matched": 34,
+    "translator_selected_files_matched": 276,
+    "headless_production_files_matched_original_build_manifest": 4
+  },
+  "license_files_sha256": {
+    "licenses/Vulkan-Headers-LICENSE.md": "95ad366d23fadf701d355bc45fb8b82ae2d700239471d35d41286ac3b08ff903",
+    "licenses/mesa-MIT.txt": "323c587d0ccf10e376f8bf9a7f31fb4ca6078105194b42e0b1e0ee2bc9bde71f",
+    "licenses/nullmoth-592b8df-LICENSE.md": "1b5c7a92697863d38fd2779af76732acfb8f521b758781eab057ad966701b0b7",
+    "licenses/nullmoth-592b8df-NOTICE.txt": "d3eb6510e54feef70d510af1ab74e8c3c57b796e5656da6b73e44bd89a07aa48",
+    "licenses/nullmoth-c7dc262-LICENSE.md": "1b5c7a92697863d38fd2779af76732acfb8f521b758781eab057ad966701b0b7",
+    "licenses/nullmoth-c7dc262-NOTICE.txt": "d3eb6510e54feef70d510af1ab74e8c3c57b796e5656da6b73e44bd89a07aa48",
+    "licenses/translator-COPYING.txt": "bc2d6664f6276fa0a72d57633b3ae68dc7dcb677b71018bf08c8e93e509f1357",
+    "licenses/translator-LICENSE.txt": "f56039b5ee783a50114de388f95ffe7173001d63c32ed4c00649045eec0cf506"
+  }
+}

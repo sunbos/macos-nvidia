@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "observed_date": "2026-10-17",
+  "evidence_type": "Selected facts from local runtime evidence; raw machine-specific log is private.",
+  "source_result_sha256": "3911a67475d9f006614303fc751e6f4e9767196d618ab52e6832f5c583fe9d5a",
+  "components_manifest": "components.json",
+  "components_manifest_sha256": "fb52aafd54bea56eb7f07dafaf1bd28604a30bea79a8d05a7c5956440b76cab6",
+  "device": {
+    "name": "NVIDIA GeForce GTX 1650 Ti with Max-Q Design (NVMTL over NVIDIA GeForce GTX 1650 Ti with Max-Q Design (NVK TU117-A))",
+    "pci_vendor": "10de",
+    "pci_device": "1f95",
+    "separate_from_intel_registry": true,
+    "mode": "headless",
+    "intel_drives_internal_panel": true
+  },
+  "probe_sha256": "50462f357a4a021a04253920c4bc1fe6587459ffffce44f8a506bc34d527cc22",
+  "exit_code": 0,
+  "timed_out": false,
+  "accepted": true,
+  "checks": [
+    {
+      "operation": "private_buffer_blit",
+      "bytes": 16384,
+      "cpu_oracle_matched": true
+    },
+    {
+      "operation": "integer_compute",
+      "integers": 1024,
+      "cpu_oracle_matched": true
+    },
+    {
+      "operation": "offscreen_render",
+      "width": 64,
+      "height": 64,
+      "pixels": 4096,
+      "maximum_unorm_difference": 1,
+      "cpu_oracle_matched": true
+    }
+  ],
+  "boot_unchanged_during_probe": true,
+  "windowserver_unchanged_during_probe": true,
+  "nonfatal_warning": "MESA VK_ERROR_UNKNOWN at nvkmd_nvrm_ctx.c:739",
+  "not_accepted_by_this_evidence": [
+    "full benchmark normal process exit",
+    "ordinary VideoProc integration",
+    "HEVC",
+    "H264 bitrate control",
+    "sustained workload stability",
+    "clean installation and recovery rehearsal"
+  ],
+  "source_display_inventory_sha256": "5ecf0a0fb2a7ea48a15ff3d49e6806310150bf8a0ab42ef7c0835fe430792e4e"
+}

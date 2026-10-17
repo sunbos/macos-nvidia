@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "profile": "macos-26.7.1-25G241/gtx-1650-ti-maxq-headless",
+  "observed_date": "2026-10-17",
+  "composition": "Historical mixed component set; not an installation of upstream v2.3.1.",
+  "source_inventory_receipt_sha256": "b0eab4fcfd2b75b149af8af1255b5be4b26221efd9a964eb82a8777f58ccd3af",
+  "kernel_component_count": 4,
+  "user_component_count": 7,
+  "components": [
+    {
+      "component": "NVMTLDriver observer",
+      "layer": "user",
+      "artifact_basename": "NVMTLDriver",
+      "observed_sha256": "eb3e77af519773eb12c3711cd9f10c8f980fca006e15f524851368eab10edc9b",
+      "hash_evidence": "2026-10-17 read-only live-file inventory; provenance receipt hash below",
+      "source_archive": "nvmtl-observer",
+      "full_rebuild_verified": false,
+      "source_manifest": "sources/manifests/nvmtl-observer.json",
+      "build_inputs": "sources/build-inputs.json"
+    },
+    {
+      "component": "AIR translator",
+      "layer": "user",
+      "artifact_basename": "libnvmtl_translate.dylib",
+      "observed_sha256": "2b8ded4fab6f467790c9dfb094eeef99fdc9641dce3626be472c24b9cde03ecb",
+      "hash_evidence": "2026-10-17 read-only live-file inventory; provenance receipt hash below",
+      "source_archive": "air-translator-nested-switch",
+      "full_rebuild_verified": false,
+      "source_manifest": "sources/manifests/air-translator-nested-switch.json",
+      "build_inputs": "sources/build-inputs.json"
+    },
+    {
+      "component": "NVK Mesa",
+      "layer": "user",
+      "artifact_basename": "libvulkan_nouveau.dylib",
+      "observed_sha256": "d8b86fca2b56f93e5206cba682910ec6e292eb494c76090b28a321268880ea92",
+      "hash_evidence": "2026-10-17 read-only live-file inventory; provenance receipt hash below",
+      "source_archive": "nvk-mesa",
+      "full_rebuild_verified": false,
+      "source_manifest": "sources/manifests/nvk-mesa.json",
+      "build_inputs": "sources/build-inputs.json"
+    },
+    {
+      "component": "H264 encoder",
+      "layer": "user",
+      "artifact_basename": "libnvenc_h264.dylib",
+      "observed_sha256": "3973ae24d136599cfea27b0c1f33c4654b4eed36c3ac842b89b00c76078e88b7",
+      "hash_evidence": "2026-10-17 read-only live-file inventory; provenance receipt hash below",
+      "source_archive": null,
+      "full_rebuild_verified": false,
+      "derivation": "Exact baseline binary plus byte patch and ad-hoc signing; not a full codec source build.",
+      "recipe": "sources/h264-binary-recipes.json",
+      "binary_redistributed": false
+    },
+    {
+      "component": "H264 decoder",
+      "layer": "user",
+      "artifact_basename": "libnvdec_h264.dylib",
+      "observed_sha256": "d1127f8139621753e5b543f4afd8ac86e6ebb1b80d3c3b32975953e68cc9adfa",
+      "hash_evidence": "2026-10-17 read-only live-file inventory; provenance receipt hash below",
+      "source_archive": null,
+      "full_rebuild_verified": false,
+      "derivation": "Exact baseline binary plus byte patch and ad-hoc signing; not a full codec source build.",
+      "recipe": "sources/h264-binary-recipes.json",
+      "binary_redistributed": false
+    },
+    {
+      "component": "HEVC encoder",
+      "layer": "user",
+      "artifact_basename": "libnvenc_hevc.dylib",
+      "observed_sha256": "779ff79b2530da0c3cf1b53c0b382527b226422df480b9614a9da0eadc6fb7c4",
+      "hash_evidence": "2026-10-17 read-only live-file inventory; provenance receipt hash below",
+      "source_archive": null,
+      "full_rebuild_verified": false,
+      "derivation": "Prebuilt library retained by historical bundle transitions. Complete source-to-binary chain not established in the bounded audit.",
+      "binary_redistributed": false
+    },
+    {
+      "component": "HEVC decoder",
+      "layer": "user",
+      "artifact_basename": "libnvdec_hevc.dylib",
+      "observed_sha256": "bf11a0bddd05e387f9b793ff80390314680df8c0ed92401e75b6cab7740b4eaf",
+      "hash_evidence": "2026-10-17 read-only live-file inventory; provenance receipt hash below",
+      "source_archive": null,
+      "full_rebuild_verified": false,
+      "derivation": "Prebuilt library retained by historical bundle transitions. Complete source-to-binary chain not established in the bounded audit.",
+      "binary_redistributed": false
+    },
+    {
+      "component": "NVRM",
+      "layer": "kernel",
+      "artifact_basename": "NVRM",
+      "observed_sha256": "ff5b370747f0793aeeb70f1740c355536d8a1db298dc56c1e25924cf4edab784",
+      "hash_evidence": "2026-10-17 read-only live-file inventory; provenance receipt hash below",
+      "source_archive": "nvrm-nvaccel-headless",
+      "full_rebuild_verified": false,
+      "source_manifest": "sources/manifests/nvrm-nvaccel-headless.json",
+      "build_inputs": "sources/build-inputs.json"
+    },
+    {
+      "component": "NVAccel",
+      "layer": "kernel",
+      "artifact_basename": "NVAccel",
+      "observed_sha256": "5b11db59eaef95ce974032b073458d2e939fb9eb54bab875a7fd3b7d6603095f",
+      "hash_evidence": "2026-10-17 read-only live-file inventory; provenance receipt hash below",
+      "source_archive": "nvrm-nvaccel-headless",
+      "full_rebuild_verified": false,
+      "source_manifest": "sources/manifests/nvrm-nvaccel-headless.json",
+      "build_inputs": "sources/build-inputs.json"
+    },
+    {
+      "component": "NVRMFB",
+      "layer": "kernel",
+      "artifact_basename": "NVRMFB",
+      "observed_sha256": "08add2defd6bfe72d872deda5f020224cf182373d74acd2e0b4001fe1e46e49b",
+      "info_plist_sha256": "a44dcb9ece863a7de948ea377e558c74c036d8a126268c834458bf0f3cd781cd",
+      "hash_evidence": "2026-10-17 direct read-only file hashing during archive preparation",
+      "source_archive": null,
+      "full_rebuild_verified": false,
+      "gap": "The exact source/build/signing chain for this installed binary was not established by this archive; do not infer it from the presence of upstream source.",
+      "binary_redistributed": false
+    },
+    {
+      "component": "NVRMAGDC",
+      "layer": "kernel",
+      "artifact_basename": "NVRMAGDC",
+      "observed_sha256": "270f9ef9ac9d2482689ed4d63d422e705e439509d0e3b62fc6bc96fdc9e693ed",
+      "info_plist_sha256": "0d594b633d27b589c79ad8a80d8d12cc417d39844096efd9d80827a09fab639e",
+      "hash_evidence": "2026-10-17 direct read-only file hashing during archive preparation",
+      "source_archive": null,
+      "full_rebuild_verified": false,
+      "gap": "The exact source/build/signing chain for this installed binary was not established by this archive; do not infer it from the presence of upstream source.",
+      "binary_redistributed": false
+    }
+  ],
+  "gaps": [
+    "Source patch validation does not prove a complete build or byte-identical binaries.",
+    "No new clean-machine rebuild, installation, reboot acceptance or recovery rehearsal was performed.",
+    "No codec, Apple, firmware or toolchain binary is redistributed by this profile."
+  ]
+}
